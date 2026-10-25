@@ -53,11 +53,9 @@ export default function MoveList({ moves, viewPly, onView }) {
     );
 
   return (
-    <section className="glass flex min-h-0 flex-1 flex-col overflow-hidden" aria-label="Movimientos">
-      <div className="flex items-center justify-between gap-2 bg-surface-container-lowest/70 px-3 py-2">
-        <span className="flex items-center gap-2 font-headline-sm text-label-badge uppercase tracking-[0.08em] text-primary">
-          <Icon name="format_list_numbered" className="!text-base" /> Movimientos
-        </span>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center justify-between gap-2 px-3 py-1">
+        <span className="font-mono-move text-[11px] uppercase tracking-widest text-outline">Notación de la partida</span>
         <div className="flex items-center">
           <NavButton icon="first_page" label="Primera jugada" onClick={() => go(0)} disabled={total === 0 || current === 0} />
           <NavButton icon="chevron_left" label="Jugada anterior" onClick={() => go(current - 1)} disabled={total === 0 || current === 0} />
@@ -92,6 +90,6 @@ export default function MoveList({ moves, viewPly, onView }) {
         )}
         <div ref={endRef} />
       </div>
-    </section>
+    </div>
   );
 }

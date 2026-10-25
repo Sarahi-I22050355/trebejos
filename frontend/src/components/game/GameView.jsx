@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Chess } from 'chess.js';
 import Board from './Board.jsx';
 import PlayerStrip from './PlayerStrip.jsx';
-import MoveList from './MoveList.jsx';
+import SidePanel from './SidePanel.jsx';
 import GameResult from './GameResult.jsx';
 import Commands, { DrawOffer } from './Commands.jsx';
 import Icon from '../Icon.jsx';
@@ -211,8 +211,8 @@ export default function GameView({ room }) {
         </div>
 
         <div className="flex flex-col gap-space-sm xl:col-span-4 xl:h-[calc(min(680px,max(320px,100dvh-15rem))+7.5rem)]">
-          <div className="flex h-72 min-h-0 flex-col xl:h-auto xl:flex-1">
-            <MoveList moves={room.moves} viewPly={viewPly} onView={setViewPly} />
+          <div className="flex h-[22rem] min-h-0 flex-col xl:h-auto xl:flex-1">
+            <SidePanel room={room} viewPly={viewPly} onView={setViewPly} />
           </div>
           <Commands
             isPlayer={isPlayer}

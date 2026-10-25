@@ -111,6 +111,12 @@ export function SessionProvider({ children }) {
       if (declinedBy) notify(`${r.players[declinedBy]?.name ?? 'Tu rival'} rechazó las tablas.`, 'info');
       commit({ ...r, drawOffer: by });
     };
+    const onChat = (m) => {
+      const r = roomRef.current;
+      if (!r || r.code !== m.code || r.chat.some((x) => x.id === m.id)) return;
+      const message = { id: m.id, name: m.name, role: m.role, text: m.text, ts: m.ts };
+      commit({ ...r, chat: [...r.chat, message].slice(-100) }); // el servidor guarda los últimos 100
+    };
     const onRematch = ({ code, rematch }) => {
       const r = roomRef.current;
       if (r && r.code === code) commit({ ...r, rematch });
@@ -131,6 +137,7 @@ export function SessionProvider({ children }) {
     socket.on('game:over', onOver);
     socket.on('game:drawOffer', onDrawOffer);
     socket.on('game:rematch', onRematch);
+    socket.on('chat:message', onChat);
     if (socket.connected) onConnect();
     else socket.connect();
 
@@ -146,6 +153,7 @@ export function SessionProvider({ children }) {
       socket.off('game:over', onOver);
       socket.off('game:drawOffer', onDrawOffer);
       socket.off('game:rematch', onRematch);
+      socket.off('chat:message', onChat);
     };
   }, [applySnapshot, notify]);
 
@@ -190,6 +198,7 @@ export function SessionProvider({ children }) {
       offerDraw: () => request('game:offerDraw'),
       respondDraw: (accept) => request('game:respondDraw', { accept }),
       rematch: () => request('game:rematch'),
+      sendChat: (text) => request('chat:send', { text }),
       leaveRoom: async () => {
         const res = await request('room:leave');
         setRoom(null);
