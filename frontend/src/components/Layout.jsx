@@ -5,6 +5,7 @@ import Avatar from './Avatar.jsx';
 import Icon from './Icon.jsx';
 import NameDialog from './NameDialog.jsx';
 import { useSession } from '../context/SessionContext.jsx';
+import { useSoundMuted } from '../hooks/useSound.js';
 
 const NAV = [
   { to: '/', label: 'Inicio', end: true },
@@ -28,6 +29,23 @@ function StatusDot({ status }) {
       aria-label={label}
       className={`h-2 w-2 shrink-0 rounded-full ${color} ${status === 'online' ? '' : 'animate-pulse'}`}
     />
+  );
+}
+
+function SoundToggle() {
+  const [muted, setMuted] = useSoundMuted();
+  return (
+    <button
+      type="button"
+      onClick={() => setMuted(!muted)}
+      aria-pressed={!muted}
+      aria-label={muted ? 'Activar sonidos' : 'Silenciar sonidos'}
+      title={muted ? 'Sonido desactivado' : 'Sonido activado'}
+      data-testid="sound-toggle"
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-surface-container-high ${muted ? 'text-outline' : 'text-primary'}`}
+    >
+      <Icon name={muted ? 'volume_off' : 'volume_up'} className="!text-xl" />
+    </button>
   );
 }
 
@@ -64,6 +82,7 @@ function Header() {
                 <span className="font-mono-move">{room.code}</span>
               </Link>
             )}
+            <SoundToggle />
             <button
               type="button"
               onClick={() => setNameOpen(true)}

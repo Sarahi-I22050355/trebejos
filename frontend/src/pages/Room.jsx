@@ -4,6 +4,7 @@ import Icon from '../components/Icon.jsx';
 import WaitingRoom from '../components/WaitingRoom.jsx';
 import GameView from '../components/game/GameView.jsx';
 import { useSession } from '../context/SessionContext.jsx';
+import { useRoomSounds } from '../hooks/useRoomSounds.js';
 import { normalizeCode } from '../lib/code.js';
 
 const ERROR_VIEW = {
@@ -70,6 +71,7 @@ export default function RoomPage() {
   const code = normalizeCode(rawCode);
   const { status, ready, room, joinRoom } = useSession();
   const [error, setError] = useState(null);
+  useRoomSounds(room?.code === code ? room : null);
 
   useEffect(() => {
     if (!ready || status !== 'online') return undefined;

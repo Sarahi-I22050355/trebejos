@@ -1,12 +1,14 @@
 // Espacio de trabajo de una lección: tablero interactivo, tutor y ejercicios.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Chess } from 'chess.js';
 import Board from '../game/Board.jsx';
 import TutorCard from './TutorCard.jsx';
 import Icon from '../Icon.jsx';
 import { legalMovesFrom } from '../../lib/board.js';
 import { demoArrows, evaluateMove, explainIllegal, hintSquares } from '../../lib/learn.js';
 import { nextLesson } from '../../lib/lessons.js';
+import { play, playLater, soundForSan } from '../../lib/sound.js';
 
 const WRONG_REVERT_MS = 1700;
 
@@ -71,7 +73,15 @@ function Exercise({ lesson, stepIndex, onStep }) {
     setFen(result.fen);
     setLastMove({ from, to });
     setShowMoves(false);
+    let san = '';
+    try {
+      san = new Chess(fen).move({ from, to, promotion }).san;
+    } catch {
+      /* jugada ya validada arriba; solo se usa para elegir el sonido */
+    }
+    play(soundForSan(san));
     if (result.success) {
+      timers.current.push(playLater('success', 260));
       setTutor({ tone: 'success', text: result.message });
       setMarks([{ square: to, tone: 'success' }]);
       setDone(true);
@@ -80,6 +90,7 @@ function Exercise({ lesson, stepIndex, onStep }) {
       setTutor({ tone: 'wrong', text: result.message });
       setMarks([{ square: to, tone: 'wrong' }]);
       setReverting(true);
+      timers.current.push(playLater('error', 260));
       later(() => {
         setFen(step.fen);
         setLastMove(null);
@@ -90,6 +101,7 @@ function Exercise({ lesson, stepIndex, onStep }) {
   }
 
   function handleIllegal(from, to) {
+    play('error');
     setTutor({ tone: 'wrong', text: explainIllegal(fen, from, to, step.notes) });
     if (to) {
       setMarks([{ square: to, tone: 'wrong' }]);

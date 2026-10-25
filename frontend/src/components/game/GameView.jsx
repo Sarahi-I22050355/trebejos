@@ -20,6 +20,7 @@ import { describeClock } from '../../lib/clock.js';
 import { describeMoveEs } from '../../lib/learn.js';
 import { copyText } from '../../lib/clipboard.js';
 import { roomLink } from '../../lib/code.js';
+import { play, soundForSan } from '../../lib/sound.js';
 
 const other = (c) => (c === 'w' ? 'b' : 'w');
 
@@ -93,8 +94,9 @@ export default function GameView({ room }) {
   async function handleMove(from, to, promotion) {
     try {
       const game = new Chess(room.fen);
-      game.move({ from, to, promotion });
+      const made = game.move({ from, to, promotion });
       setPending({ fen: game.fen(), lastMove: { from, to }, ply: room.ply });
+      play(soundForSan(made.san)); // suena al instante; el servidor solo confirma
     } catch {
       return; // el tablero solo ofrece jugadas legales; por si acaso
     }
@@ -111,6 +113,14 @@ export default function GameView({ room }) {
     if (playing && clock.running === color) ms -= serverNow - clock.serverTime;
     return Math.max(0, ms);
   };
+
+  // Aviso de poco tiempo: un pitido a los 10 s y uno por segundo en los últimos 5, solo con tu reloj corriendo.
+  const mySecondsLeft = isPlayer && playing && clock.enabled && clock.running === myColor ? Math.ceil(remaining(myColor) / 1000) : null;
+  useEffect(() => {
+    if (mySecondsLeft == null || mySecondsLeft <= 0) return;
+    if (mySecondsLeft === 10) play('warn');
+    else if (mySecondsLeft <= 5) play('tick');
+  }, [mySecondsLeft]);
 
   const captured = capturedBy(room.moves);
   const summary = room.status === 'finished' ? describeResult(room.result, room.players, myColor) : null;
