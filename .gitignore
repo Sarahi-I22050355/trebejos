@@ -3,3 +3,4 @@ dist/
 .env
 *.log
 .DS_Store
+frontend/e2e/screenshots/
