@@ -50,3 +50,11 @@ export function formatElapsed(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
+
+/** Tiempo que tardó una jugada: "0.8s" bajo diez segundos, "1:05" a partir de ahí; vacío si no hubo reloj. */
+export function formatSpent(ms) {
+  if (ms == null) return '';
+  if (ms < 10_000) return `${(ms / 1000).toFixed(1)}s`;
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}

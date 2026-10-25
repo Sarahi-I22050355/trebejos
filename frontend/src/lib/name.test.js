@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sanitizeName, randomName } from './name.js';
 import { normalizeCode, extractCode } from './code.js';
-import { formatClock, describeClock, clockCategory } from './clock.js';
+import { formatClock, describeClock, clockCategory, formatSpent } from './clock.js';
 
 test('sanitizeName replica las reglas del servidor', () => {
   assert.equal(sanitizeName('  Caballo   Veloz_42 '), 'Caballo Veloz_42');
@@ -35,4 +35,12 @@ test('relojes', () => {
   assert.equal(describeClock(null).short, 'Sin reloj');
   assert.deepEqual(['60000', '180000', '300000', '600000', '900000'].map((ms) => clockCategory(+ms).label),
     ['Bala', 'Blitz', 'Blitz', 'Rápida', 'Clásica']);
+});
+
+test('formatSpent muestra décimas bajo 10 s y minutos después', () => {
+  assert.equal(formatSpent(800), '0.8s');
+  assert.equal(formatSpent(0), '0.0s');
+  assert.equal(formatSpent(9_949), '9.9s');
+  assert.equal(formatSpent(65_000), '1:05');
+  assert.equal(formatSpent(null), '');
 });

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import Icon from '../Icon.jsx';
+import { formatSpent } from '../../lib/clock.js';
 
 function NavButton({ icon, label, onClick, disabled }) {
   return (
@@ -84,6 +85,14 @@ export default function MoveList({ moves, viewPly, onView }) {
                 <span className="w-8 shrink-0 pl-2 text-outline">{i + 1}.</span>
                 {cell(w)}
                 {cell(b)}
+                <span className="flex w-24 shrink-0 items-center justify-end gap-2 pr-2 text-body-sm">
+                  {[w, b].some((m) => m?.san.includes('+')) && <span className="text-label-badge text-error">Jaque</span>}
+                  {[w, b].some((m) => m?.ply === current) && viewPly == null && i === rows.length - 1 ? (
+                    <span className="rounded bg-primary-container px-1.5 py-0.5 text-[10px] font-bold uppercase text-on-primary-fixed">Actual</span>
+                  ) : (
+                    <span className="text-outline">{formatSpent((b ?? w).spentMs)}</span>
+                  )}
+                </span>
               </li>
             ))}
           </ol>

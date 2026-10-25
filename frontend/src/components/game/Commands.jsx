@@ -1,4 +1,5 @@
 import Icon from '../Icon.jsx';
+import { useSoundMuted } from '../../hooks/useSound.js';
 
 function Command({ icon, tone, children, ...props }) {
   return (
@@ -31,6 +32,7 @@ export function DrawOffer({ name, onAccept, onDecline }) {
 
 /** Panel de comandos: cambia según seas jugador, espectador o la partida haya terminado. */
 export default function Commands({ isPlayer, playing, canDraw = true, showHint = false, canHint = false, onHint, drawOfferedByMe, onDraw, onResign, onFlip, onLeave }) {
+  const [muted, setMuted] = useSoundMuted();
   return (
     <section className="glass flex flex-col gap-2 p-space-md" aria-label="Comandos de partida">
       <div className="pb-1 font-mono-move text-[11px] uppercase tracking-widest text-outline">Comandos de partida</div>
@@ -51,6 +53,9 @@ export default function Commands({ isPlayer, playing, canDraw = true, showHint =
           </>
         )}
         <Command icon="flip_camera_android" tone="text-secondary" onClick={onFlip} data-testid="btn-flip">Voltear tablero</Command>
+        <Command icon={muted ? 'volume_off' : 'volume_up'} tone={muted ? 'text-outline' : 'text-primary'} onClick={() => setMuted(!muted)} aria-pressed={!muted} data-testid="btn-sound">
+          {muted ? 'Sonido: no' : 'Sonido: sí'}
+        </Command>
         {(!isPlayer || !playing) && (
           <Command icon="logout" tone="text-outline" onClick={onLeave} data-testid="btn-leave">Salir</Command>
         )}

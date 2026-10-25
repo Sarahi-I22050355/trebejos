@@ -140,7 +140,7 @@ export default function WaitingRoom({ room }) {
             <span
               data-testid="room-code"
               aria-label={`Código ${room.code.split('').join(' ')}`}
-              className="text-gradient my-space-xs select-all whitespace-nowrap font-headline-xxl text-headline-xxl-mobile tracking-[0.18em] drop-shadow-[0_0_24px_rgba(0,240,255,0.4)] sm:text-headline-xxl"
+              className="text-gradient my-space-xs select-all whitespace-nowrap font-headline-xxl text-headline-xxl-mobile tracking-[0.22em] drop-shadow-[0_0_24px_rgba(0,240,255,0.4)] sm:text-[3.75rem] sm:leading-[4rem]"
             >
               {formatCode(room.code)}
             </span>
@@ -266,6 +266,24 @@ export default function WaitingRoom({ room }) {
               hint={isPublic ? 'Aparece en “Salas públicas”' : 'Solo se entra con el código'}
               action={<Switch checked={isPublic} disabled={busy} onChange={toggleVisibility} label="Sala pública" />}
             />
+          </div>
+        </div>
+
+        <div className="relative mt-space-md flex flex-col items-start justify-between gap-space-sm rounded-xl bg-surface-container/60 px-space-md py-space-sm sm:flex-row sm:items-center" data-testid="invite-row">
+          <div className="flex items-center gap-space-sm">
+            <Icon name="share" className="text-secondary" />
+            <div className="flex flex-col">
+              <span className="font-headline-sm text-body-md text-on-surface">Invitar jugadores directamente</span>
+              <span className="text-body-sm text-on-surface-variant">Pasa el código o el enlace por el chat que prefieras.</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-space-xs">
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => copy(room.code, 'Código copiado')}>
+              <Icon name="content_copy" className="!text-lg" /> Copiar código
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => copy(roomLink(room.code), 'Enlace de invitación copiado')}>
+              <Icon name="link" className="!text-lg" /> Copiar link
+            </button>
           </div>
         </div>
 

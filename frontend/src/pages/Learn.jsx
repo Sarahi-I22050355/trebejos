@@ -85,7 +85,7 @@ export default function Learn() {
                   <span className="text-body-md text-on-surface-variant">Practica una partida contra el bot fácil, con pistas del tutor.</span>
                 </div>
               </div>
-              <div className="flex flex-wrap justify-center gap-space-sm">
+              <div className="flex shrink-0 flex-wrap justify-center gap-space-sm sm:flex-nowrap [&>a]:whitespace-nowrap">
                 {following && following.id !== 'practica' && (
                   <Link to={`/aprender/${following.id}`} className="btn btn-secondary btn-sm">Siguiente lección</Link>
                 )}
