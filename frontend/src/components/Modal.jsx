@@ -1,7 +1,11 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from './Icon.jsx';
 
-/** Diálogo accesible: Esc y clic fuera cierran; el foco entra al abrir y vuelve al cerrar. */
+/**
+ * Diálogo accesible: Esc y clic fuera cierran; el foco entra al abrir y vuelve al cerrar.
+ * Se dibuja en un portal sobre <body>: dentro de <main> (z-10) el pie de página lo taparía.
+ */
 export default function Modal({ open, onClose, title, icon, children, footer, size = 'md' }) {
   const panelRef = useRef(null);
 
@@ -24,7 +28,7 @@ export default function Modal({ open, onClose, title, icon, children, footer, si
   if (!open) return null;
   const width = size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-2xl' : 'max-w-lg';
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[90] flex items-end justify-center p-0 sm:items-center sm:p-4" role="presentation">
       <div className="absolute inset-0 bg-surface-container-lowest/80 backdrop-blur-sm" onClick={onClose} />
       <div
@@ -56,6 +60,7 @@ export default function Modal({ open, onClose, title, icon, children, footer, si
         <div className="overflow-y-auto px-space-lg pb-space-lg">{children}</div>
         {footer && <div className="flex flex-col-reverse gap-2 px-space-lg pb-space-lg sm:flex-row sm:justify-end">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

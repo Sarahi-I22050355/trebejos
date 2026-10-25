@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
 import WaitingRoom from '../components/WaitingRoom.jsx';
-import RoomLive from '../components/RoomLive.jsx';
+import GameView from '../components/game/GameView.jsx';
 import { useSession } from '../context/SessionContext.jsx';
 import { normalizeCode } from '../lib/code.js';
 
@@ -90,7 +90,7 @@ export default function RoomPage() {
     };
   }, [ready, status, code, room?.code, joinRoom]);
 
-  if (room && room.code === code) return room.status === 'waiting' ? <WaitingRoom room={room} /> : <RoomLive room={room} />;
+  if (room && room.code === code) return room.status === 'waiting' ? <WaitingRoom room={room} /> : <GameView room={room} />;
   if (error) return <RoomError error={error} />;
   return <Connecting text={status === 'online' ? 'Entrando a la sala…' : 'Conectando con el servidor…'} />;
 }

@@ -239,6 +239,13 @@ describe('partida en tiempo real', () => {
     await guest.emit('game:rematch');
     const fresh = await host.waitFor('room:state', (s) => s.status === 'playing' && s.result === null && s.you.color === 'b');
     assert.equal(fresh.ply, 0); // los colores se intercambiaron
+
+    // Con los colores nuevos ambos pueden jugar y chatear (la sesión debe conocer su rol actualizado).
+    assert.equal((await host.emit('game:move', { from: 'e2', to: 'e4' })).error.code, 'NOT_YOUR_TURN');
+    assert.deepEqual(await guest.emit('game:move', { from: 'e2', to: 'e4' }), { ok: true, ply: 1 });
+    assert.deepEqual(await host.emit('game:move', { from: 'e7', to: 'e5' }), { ok: true, ply: 2 });
+    assert.equal((await host.emit('chat:send', { text: 'revancha!' })).ok, true);
+    assert.equal((await guest.waitFor('chat:message', (m) => m.text === 'revancha!')).role, 'b');
   });
 
   test('el reloj corre en el servidor y da la victoria por tiempo', async () => {

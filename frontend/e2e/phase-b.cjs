@@ -21,6 +21,9 @@ async function newPlayer(browser, label, viewport = { width: 1440, height: 900 }
 }
 
 async function setName(page, name) {
+  // Esperar a estar en línea: el nombre inicial que manda el servidor llega justo en ese momento y
+  // una persona no puede teclear en el mismo milisegundo; la automatización sí.
+  await page.getByText('Servidor en línea').waitFor();
   const input = page.locator('#player-name');
   await input.fill(name);
   await input.press('Enter');
@@ -113,23 +116,22 @@ async function setName(page, name) {
     await guest.page.getByLabel('Código de sala').fill(`#${code.toLowerCase()}`);
     await guest.page.getByRole('button', { name: /Conectar a la sala/ }).click();
     await guest.page.waitForURL(new RegExp(`/sala/${code}$`));
-    await guest.page.getByTestId('room-live').waitFor();
-    await host.page.getByTestId('room-live').waitFor();
+    await guest.page.getByTestId('board').waitFor();
+    await host.page.getByTestId('board').waitFor();
     step('al entrar el segundo jugador la partida arranca sola en ambos navegadores');
     for (const p of [host.page, guest.page]) {
-      const text = await p.getByTestId('room-live').innerText();
+      const text = await p.locator('main').innerText();
       assert.ok(text.includes('Ana Torres') && text.includes('Beto Ruiz'));
     }
-    const hostText = await host.page.getByTestId('room-live').innerText();
-    assert.match(hostText, /Ana Torres[\s\S]*\(t[úu]\)/i);
+    assert.match(await host.page.getByTestId('strip-w').innerText(), /Ana Torres[\s\S]*T[úu]/i);
     await host.page.screenshot({ path: path.join(SHOTS, '05-room-live.png'), fullPage: true });
 
     // ----------------------------------------- reconexión: recargar y volver a la misma sala
-    const before = await guest.page.locator('[data-testid="fen"]').innerText();
     await guest.page.reload();
-    await guest.page.getByTestId('room-live').waitFor();
-    assert.equal(await guest.page.locator('[data-testid="fen"]').innerText(), before);
-    assert.match(await guest.page.getByTestId('room-live').innerText(), /Beto Ruiz[\s\S]*\(t[úu]\)/i);
+    await guest.page.getByTestId('board').waitFor();
+    assert.equal(await guest.page.locator('[data-piece]').count(), 32);
+    assert.equal(await guest.page.getByTestId('board').getAttribute('data-orientation'), 'b'); // sigue con negras
+    assert.match(await guest.page.getByTestId('strip-b').innerText(), /Beto Ruiz[\s\S]*T[úu]/i);
     step('recargar la página devuelve al jugador a la misma sala y posición, sin pedir nada');
 
     // ------------------------------------------ desconexión: el rival ve la cuenta regresiva
@@ -149,7 +151,7 @@ async function setName(page, name) {
     await back.goto(`${BASE}/`);
     await back.getByRole('link', { name: /En sala/ }).waitFor(); // el encabezado recuerda su sala
     await back.getByRole('link', { name: /En sala/ }).click();
-    await back.getByTestId('room-live').waitFor();
+    await back.getByTestId('board').waitFor();
     await host.page.getByText('se desconectó').waitFor({ state: 'detached', timeout: 8000 });
     step('al volver con el mismo token se reincorpora y desaparece el aviso del rival');
 
@@ -163,12 +165,11 @@ async function setName(page, name) {
 
     // un tercero con el enlace entra como espectador
     await stranger.page.goto(`${BASE}/sala/${code}`);
-    await stranger.page.getByText('Estás viendo esta partida').waitFor();
+    await stranger.page.locator('.badge', { hasText: 'Espectador' }).waitFor();
     step('un tercero que abre el enlace de una sala llena entra como espectador');
 
     // ------------------------------------------------------------------ salir de la sala
-    await stranger.page.getByRole('button', { name: 'Salir', exact: true }).click();
-    await stranger.page.getByRole('dialog').getByRole('button', { name: 'Salir', exact: true }).click();
+    await stranger.page.getByTestId('btn-leave').click(); // los espectadores salen sin confirmación
     await stranger.page.waitForURL(`${BASE}/`);
     step('el espectador puede salir y vuelve al inicio');
 

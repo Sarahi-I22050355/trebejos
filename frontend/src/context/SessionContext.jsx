@@ -27,6 +27,7 @@ export function SessionProvider({ children }) {
   nameRef.current = name;
   const roomRef = useRef(room);
   roomRef.current = room;
+  // (los handlers de juego también actualizan roomRef al instante; ver `commit`)
 
   const applySnapshot = useCallback((snapshot) => {
     setRoom(snapshot ?? null);
@@ -70,6 +71,50 @@ export function SessionProvider({ children }) {
           : r,
       );
     };
+    // Aplica un cambio a la sala y mantiene `roomRef` al día para encadenar eventos seguidos.
+    const commit = (next) => {
+      roomRef.current = next;
+      setRoom(next);
+    };
+    const syncClock = (clock) => clock?.enabled && setClockOffset(clock.serverTime - Date.now());
+
+    const onMove = (m) => {
+      const r = roomRef.current;
+      if (!r || r.code !== m.code) return;
+      if (m.ply !== r.ply + 1) {
+        // Salto en la numeración (evento perdido o repetido): se pide el estado completo.
+        request('room:sync').then((res) => res.ok && applySnapshot(res.room));
+        return;
+      }
+      syncClock(m.clock);
+      commit({
+        ...r,
+        fen: m.fen,
+        turn: m.turn,
+        inCheck: m.inCheck,
+        ply: m.ply,
+        lastMove: { from: m.from, to: m.to },
+        clock: m.clock,
+        drawOffer: null,
+        moves: [...r.moves, { ply: m.ply, san: m.san, from: m.from, to: m.to, color: m.color, piece: m.piece, captured: m.captured, promotion: m.promotion, ts: m.ts, spentMs: m.spentMs }],
+      });
+    };
+    const onOver = ({ code, result, fen, clock }) => {
+      const r = roomRef.current;
+      if (!r || r.code !== code) return;
+      syncClock(clock);
+      commit({ ...r, status: 'finished', result, fen, clock, drawOffer: null, rematch: [] });
+    };
+    const onDrawOffer = ({ code, by, declinedBy }) => {
+      const r = roomRef.current;
+      if (!r || r.code !== code) return;
+      if (declinedBy) notify(`${r.players[declinedBy]?.name ?? 'Tu rival'} rechazó las tablas.`, 'info');
+      commit({ ...r, drawOffer: by });
+    };
+    const onRematch = ({ code, rematch }) => {
+      const r = roomRef.current;
+      if (r && r.code === code) commit({ ...r, rematch });
+    };
     const onClosed = ({ code, reason }) => {
       setRoom((r) => (r && r.code === code ? null : r));
       notify(CLOSED_REASONS[reason] ?? 'La sala se cerró.', 'info');
@@ -82,6 +127,10 @@ export function SessionProvider({ children }) {
     socket.on('room:spectators', onSpectators);
     socket.on('presence:update', onPresence);
     socket.on('room:closed', onClosed);
+    socket.on('game:move', onMove);
+    socket.on('game:over', onOver);
+    socket.on('game:drawOffer', onDrawOffer);
+    socket.on('game:rematch', onRematch);
     if (socket.connected) onConnect();
     else socket.connect();
 
@@ -93,6 +142,10 @@ export function SessionProvider({ children }) {
       socket.off('room:spectators', onSpectators);
       socket.off('presence:update', onPresence);
       socket.off('room:closed', onClosed);
+      socket.off('game:move', onMove);
+      socket.off('game:over', onOver);
+      socket.off('game:drawOffer', onDrawOffer);
+      socket.off('game:rematch', onRematch);
     };
   }, [applySnapshot, notify]);
 
@@ -132,6 +185,11 @@ export function SessionProvider({ children }) {
       joinRoom: (code) => withRoom('room:join')({ code }),
       joinRandom: () => withRoom('room:joinRandom')(),
       setVisibility: (visibility) => withRoom('room:setVisibility')({ visibility }),
+      move: (from, to, promotion) => request('game:move', { from, to, promotion }),
+      resign: () => request('game:resign'),
+      offerDraw: () => request('game:offerDraw'),
+      respondDraw: (accept) => request('game:respondDraw', { accept }),
+      rematch: () => request('game:rematch'),
       leaveRoom: async () => {
         const res = await request('room:leave');
         setRoom(null);

@@ -30,11 +30,18 @@ export class RoomManager {
 
   // ------------------------------------------------------------------ helpers
 
-  /** Sala en la que realmente está la sesión (o `null`, limpiando datos obsoletos). */
+  /**
+   * Sala en la que realmente está la sesión (o `null`, limpiando datos obsoletos).
+   * La fuente de verdad del rol es la sala (p. ej. una revancha intercambia los colores):
+   * si la sesión es miembro, se adopta su rol real en lugar de tratarla como expulsada.
+   */
   activeRoomOf(session) {
     const room = session.roomCode ? this.rooms.get(session.roomCode) : null;
-    const valid = room && room.roleOf(session.token) === session.role && session.role !== null;
-    if (valid) return room;
+    const role = room?.roleOf(session.token) ?? null;
+    if (room && role) {
+      session.role = role;
+      return room;
+    }
     session.roomCode = null;
     session.role = null;
     return null;
@@ -304,7 +311,13 @@ export class RoomManager {
   }
 
   requestRematch(session) {
-    this.#requireRoom(session).requestRematch(session.token);
+    const room = this.#requireRoom(session);
+    room.requestRematch(session.token);
+    // Si empezó la revancha, los asientos cambiaron de color: se actualiza el rol de cada sesión.
+    for (const color of room.activePlayers()) {
+      const seated = this.sessions.get(room.players[color].token);
+      if (seated?.roomCode === room.code) seated.role = color;
+    }
   }
 
   sendChat(session, rawText) {
