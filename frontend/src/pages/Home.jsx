@@ -10,6 +10,8 @@ import { useLobby } from '../hooks/useLobby.js';
 import { NAME_HINT, randomName, sanitizeName } from '../lib/name.js';
 import { extractCode } from '../lib/code.js';
 import { CLOCK_PRESETS, describeClock } from '../lib/clock.js';
+import { BOT_COLORS, BOT_LEVELS } from '../lib/bot.js';
+import { safeStorage } from '../lib/storage.js';
 
 /** Tarjeta de modo de juego (Bot / Crear / Unirse / Salas públicas). */
 function ModeCard({ icon, iconTone, badge, title, description, children, action }) {
@@ -33,12 +35,10 @@ function ModeCard({ icon, iconTone, badge, title, description, children, action 
   );
 }
 
-const BOT_LEVELS = ['Principiante', 'Intermedio', 'Avanzado', 'Experto'];
-
 export default function Home() {
   const navigate = useNavigate();
   const { notify } = useToast();
-  const { status, name, room, rename, createRoom } = useSession();
+  const { status, name, room, rename, createRoom, startBot, features } = useSession();
   const lobby = useLobby();
   const online = status === 'online';
 
@@ -49,7 +49,13 @@ export default function Home() {
   const [creating, setCreating] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const [codeError, setCodeError] = useState('');
-  const [botLevel, setBotLevel] = useState(1);
+  const [botLevel, setBotLevel] = useState(() => {
+    const raw = safeStorage.get('trebejos:botLevel');
+    const saved = raw === null ? NaN : Number(raw); // Number(null) sería 0
+    return Number.isInteger(saved) && saved >= 0 && saved < BOT_LEVELS.length ? saved : 1;
+  });
+  const [botColor, setBotColor] = useState(() => (['w', 'b', 'random'].includes(safeStorage.get('trebejos:botColor')) ? safeStorage.get('trebejos:botColor') : 'w'));
+  const [botStarting, setBotStarting] = useState(false);
 
   // El campo sigue al nombre del servidor SOLO mientras el usuario no lo haya tocado; si no,
   // el nombre que llega al terminar de conectar pisaría lo que está escribiendo.
@@ -95,6 +101,17 @@ export default function Home() {
       return notify(res.error.message, 'error');
     }
     setCreateOpen(false);
+    navigate(`/sala/${res.code}`);
+  }
+
+  async function handleBot() {
+    if (!(await commitName())) return;
+    safeStorage.set('trebejos:botLevel', String(botLevel));
+    safeStorage.set('trebejos:botColor', botColor);
+    setBotStarting(true);
+    const res = await startBot({ level: BOT_LEVELS[botLevel].id, color: botColor });
+    setBotStarting(false);
+    if (!res.ok) return notify(res.error.message, 'error');
     navigate(`/sala/${res.code}`);
   }
 
@@ -187,33 +204,58 @@ export default function Home() {
         <ModeCard
           icon="smart_toy"
           iconTone="bg-primary-container/10 text-primary-container"
-          badge={<span className="badge bg-surface-container-highest text-outline">Próximamente</span>}
+          badge={
+            features.bot ? (
+              <span className="badge bg-surface-container-highest text-primary">Stockfish</span>
+            ) : (
+              <span className="badge bg-surface-container-highest text-outline">{online ? 'No disponible' : '…'}</span>
+            )
+          }
           title="Jugar contra el bot"
           description="Practica contra el motor Stockfish, desde principiante hasta experto, con el color que prefieras."
           action={
-            <button type="button" className="btn btn-secondary w-full" disabled>
-              <Icon name="play_arrow" className="!text-xl" /> Iniciar partida
+            <button type="button" className="btn btn-secondary w-full !text-on-surface hover:!bg-primary-container hover:!text-on-primary-fixed" disabled={!online || !features.bot || botStarting} onClick={handleBot}>
+              <Icon name={botStarting ? 'progress_activity' : 'play_arrow'} className={`!text-xl ${botStarting ? 'animate-spin' : ''}`} />
+              {botStarting ? 'Preparando…' : 'Iniciar partida'}
             </button>
           }
         >
-          <div className="flex flex-col gap-1.5 rounded-lg bg-surface-container-lowest p-space-sm">
+          <div className="flex flex-col gap-2 rounded-lg bg-surface-container-lowest p-space-sm">
             <div className="flex items-center justify-between font-mono-move text-body-sm text-on-surface-variant">
               <span>NIVEL</span>
-              <span className="font-bold text-primary">{BOT_LEVELS[botLevel]}</span>
+              <span className="font-bold text-primary" data-testid="bot-level-label">{BOT_LEVELS[botLevel].label}</span>
             </div>
             <div className="grid grid-cols-4 gap-1" role="radiogroup" aria-label="Nivel del bot">
               {BOT_LEVELS.map((level, i) => (
                 <button
-                  key={level}
+                  key={level.id}
                   type="button"
                   role="radio"
                   aria-checked={botLevel === i}
-                  aria-label={level}
+                  aria-label={level.label}
+                  title={`${level.label}: ${level.hint}`}
                   onClick={() => setBotLevel(i)}
-                  className={`h-2 rounded-full transition-all ${i <= botLevel ? 'bg-gradient-to-r from-primary-container to-secondary shadow-[0_0_8px_rgba(0,240,255,0.5)]' : 'bg-surface-container-highest'}`}
-                />
+                  className="group py-1.5"
+                >
+                  <span className={`block h-2 rounded-full transition-all ${i <= botLevel ? 'bg-gradient-to-r from-primary-container to-secondary shadow-[0_0_8px_rgba(0,240,255,0.5)]' : 'bg-surface-container-highest group-hover:bg-surface-bright'}`} />
+                </button>
               ))}
             </div>
+            <p className="text-body-sm text-outline">{BOT_LEVELS[botLevel].hint}</p>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5 text-center font-mono-move text-body-sm" role="radiogroup" aria-label="Tu color contra el bot">
+            {BOT_COLORS.map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                role="radio"
+                aria-checked={botColor === c.value}
+                onClick={() => setBotColor(c.value)}
+                className={`rounded-md py-1.5 transition-colors ${botColor === c.value ? 'bg-surface-container-highest font-bold text-primary' : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface'}`}
+              >
+                {c.label}
+              </button>
+            ))}
           </div>
         </ModeCard>
 

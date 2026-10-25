@@ -42,7 +42,9 @@ export default function GameResult({ room, summary, onClose, onLeave }) {
           {canRematch && (
             <button type="button" className="btn btn-primary btn-sm w-full" disabled={iAsked} onClick={askRematch}>
               <Icon name="replay" className="!text-lg" />
-              {iAsked ? `Esperando a ${opponent.name}…` : theyAsked ? `${opponent.name} quiere revancha` : 'Pedir revancha'}
+              {room.mode === 'bot'
+                ? 'Jugar otra vez (colores invertidos)'
+                : iAsked ? `Esperando a ${opponent.name}…` : theyAsked ? `${opponent.name} quiere revancha` : 'Pedir revancha'}
             </button>
           )}
           {me && opponent?.left && <p className="text-body-sm text-outline">Tu rival ya salió de la sala.</p>}

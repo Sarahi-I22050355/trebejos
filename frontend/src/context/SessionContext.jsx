@@ -22,6 +22,7 @@ export function SessionProvider({ children }) {
   const [ready, setReady] = useState(false); // ya hubo un session:init exitoso
   const [name, setName] = useState(() => loadName() ?? '');
   const [room, setRoom] = useState(null);
+  const [features, setFeatures] = useState({ bot: false }); // capacidades que declara el servidor
   const [clockOffset, setClockOffset] = useState(0); // serverTime - Date.now()
   const nameRef = useRef(name);
   nameRef.current = name;
@@ -53,6 +54,7 @@ export function SessionProvider({ children }) {
       }
       setName(finalName);
       storeName(finalName);
+      setFeatures(res.server ?? { bot: false });
       applySnapshot(res.room);
       setStatus('online');
       setReady(true);
@@ -190,6 +192,7 @@ export function SessionProvider({ children }) {
     () => ({
       rename,
       createRoom: withRoom('room:create'),
+      startBot: withRoom('bot:start'),
       joinRoom: (code) => withRoom('room:join')({ code }),
       joinRandom: () => withRoom('room:joinRandom')(),
       setVisibility: (visibility) => withRoom('room:setVisibility')({ visibility }),
@@ -200,17 +203,19 @@ export function SessionProvider({ children }) {
       rematch: () => request('game:rematch'),
       sendChat: (text) => request('chat:send', { text }),
       leaveRoom: async () => {
-        const res = await request('room:leave');
+        // Se sale de inmediato en la interfaz (sin esperar al servidor): evita que el chip "En sala"
+        // parpadee tras volver al inicio. Si el servidor rechazara salir, el próximo room:state lo corrige.
+        roomRef.current = null;
         setRoom(null);
-        return res;
+        return request('room:leave');
       },
     }),
     [rename, withRoom],
   );
 
   const value = useMemo(
-    () => ({ status, ready, name, room, clockOffset, ...actions }),
-    [status, ready, name, room, clockOffset, actions],
+    () => ({ status, ready, name, room, clockOffset, features, ...actions }),
+    [status, ready, name, room, clockOffset, features, actions],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

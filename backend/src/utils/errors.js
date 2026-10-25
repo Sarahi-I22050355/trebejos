@@ -33,6 +33,7 @@ export const ERRORS = {
   notYourTurn: () => new AppError('NOT_YOUR_TURN', 'No es tu turno.'),
   illegalMove: () => new AppError('ILLEGAL_MOVE', 'Movimiento ilegal.'),
   rematchUnavailable: () => new AppError('REMATCH_UNAVAILABLE', 'Tu rival ya no está en la sala.'),
+  botUnavailable: () => new AppError('BOT_UNAVAILABLE', 'El bot no está disponible en este servidor.'),
   rateLimited: () => new AppError('RATE_LIMITED', 'Vas demasiado rápido. Espera un momento.'),
   badRequest: (msg = 'Solicitud inválida.') => new AppError('BAD_REQUEST', msg),
 };

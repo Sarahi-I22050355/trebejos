@@ -9,13 +9,15 @@ import { loadConfig } from './config.js';
 import { SessionStore } from './rooms/SessionStore.js';
 import { RoomManager } from './rooms/RoomManager.js';
 import { attachSockets } from './sockets/index.js';
+import { BotService } from './bot/BotService.js';
 
 export function createServer(overrides = {}) {
   const config = loadConfig(overrides);
   const startedAt = Date.now();
 
   const sessions = new SessionStore();
-  const manager = new RoomManager({ config, sessions });
+  const bots = new BotService({ config });
+  const manager = new RoomManager({ config, sessions, bots });
 
   const app = express();
   app.disable('x-powered-by');
@@ -30,7 +32,12 @@ export function createServer(overrides = {}) {
 
   // Healthcheck para Docker / monitoreo.
   app.get('/health', (req, res) => {
-    res.json({ status: 'ok', rooms: manager.rooms.size, uptimeSeconds: Math.round((Date.now() - startedAt) / 1000) });
+    res.json({
+      status: 'ok',
+      rooms: manager.rooms.size,
+      bot: { available: bots.available, engine: bots.engineName },
+      uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
+    });
   });
 
   // En producción el mismo proceso sirve el build de Vite (un solo puerto, sin CORS).
@@ -61,7 +68,8 @@ export function createServer(overrides = {}) {
     httpServer,
     manager,
     sessions,
-    listen(port = config.port, host = config.host) {
+    async listen(port = config.port, host = config.host) {
+      await bots.start(); // si Stockfish no está, el servidor arranca igual con el bot desactivado
       return new Promise((resolve, reject) => {
         httpServer.once('error', reject);
         httpServer.listen(port, host, () => resolve(httpServer.address().port));
@@ -69,8 +77,15 @@ export function createServer(overrides = {}) {
     },
     async close() {
       realtime.close();
+      bots.close();
       manager.close();
+      // Las conexiones HTTP keep-alive en reposo retrasarían el cierre del servidor: se cortan ya,
+      // y si alguna sigue activa pasado un segundo, también.
+      httpServer.closeIdleConnections?.();
+      const forceTimer = setTimeout(() => httpServer.closeAllConnections?.(), 1000);
+      forceTimer.unref?.();
       await io.close(); // también cierra el servidor HTTP subyacente
+      clearTimeout(forceTimer);
     },
   };
 }

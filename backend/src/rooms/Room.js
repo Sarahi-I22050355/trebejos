@@ -20,10 +20,12 @@ export class Room {
    * @param {(type:string, payload?:object)=>void} opts.notify
    * @param {string} [opts.startFen]  solo para pruebas
    */
-  constructor({ code, visibility, clock = null, notify = () => {}, now = Date.now, startFen = null, chatHistory = 100 }) {
+  constructor({ code, visibility, clock = null, notify = () => {}, now = Date.now, startFen = null, chatHistory = 100, bot = null }) {
     this.code = code;
     this.visibility = visibility;
-    this.mode = 'pvp';
+    /** Partida contra el bot: { level, label, color, token, thinking } (color = el del bot). */
+    this.bot = bot;
+    this.mode = bot ? 'bot' : 'pvp';
     this.status = STATUS.WAITING;
     this.hostToken = null;
 
@@ -62,6 +64,19 @@ export class Room {
   addPlayer(color, { token, name }) {
     this.players[color] = { token, name, connected: true, left: false, graceTimer: null, graceEndsAt: null };
     this.touch();
+  }
+
+  /** Asiento virtual del bot: nunca se desconecta ni abandona por su cuenta. */
+  addBotSeat() {
+    this.players[this.bot.color] = {
+      token: this.bot.token, name: `Bot ${this.bot.label}`, isBot: true,
+      connected: true, left: false, graceTimer: null, graceEndsAt: null,
+    };
+  }
+
+  /** Jugadores humanos que siguen en la sala. */
+  humanPlayers() {
+    return this.activePlayers().filter((c) => !this.players[c].isBot);
   }
 
   addSpectator({ token, name }) {
@@ -284,6 +299,7 @@ export class Room {
 
   offerDraw(token) {
     const color = this.#requirePlayerInGame(token);
+    if (this.bot) throw ERRORS.badRequest('El bot no acepta tablas.');
     if (this.drawOffer === other(color)) {
       // Ambos quieren tablas: equivale a aceptar.
       this.endGame(null, 'agreement');
@@ -314,12 +330,14 @@ export class Room {
     if (!color) throw ERRORS.notPlayer();
     if (this.activePlayers().length < 2) throw ERRORS.rematchUnavailable();
     this.rematch.add(color);
+    if (this.bot) this.rematch.add(this.bot.color); // el bot siempre acepta la revancha
     this.touch();
     if (this.rematch.size < 2) {
       this.notify('rematch', { rematch: [...this.rematch] });
       return;
     }
     [this.players.w, this.players.b] = [this.players.b, this.players.w];
+    if (this.bot) this.bot.color = this.players.w.isBot ? 'w' : 'b';
     this.#resetGame();
     this.startGame();
     this.notify('state');
@@ -345,7 +363,7 @@ export class Room {
 
   #seatView(seat) {
     if (!seat) return null;
-    return { name: seat.name, connected: seat.connected, left: seat.left, graceEndsAt: seat.graceEndsAt };
+    return { name: seat.name, connected: seat.connected, left: seat.left, graceEndsAt: seat.graceEndsAt, isBot: !!seat.isBot };
   }
 
   /** Estado completo de la sala visto por `viewerToken`. Nunca incluye tokens. */
@@ -355,6 +373,7 @@ export class Room {
       code: this.code,
       visibility: this.visibility,
       mode: this.mode,
+      bot: this.bot && { level: this.bot.level, label: this.bot.label },
       status: this.status,
       serverTime: this.now(),
       createdAt: this.createdAt,

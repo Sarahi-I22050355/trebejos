@@ -50,7 +50,7 @@ export function createHandlers({ manager, sessions, channels, detachSocket }) {
         // Reincorpora a la sala si seguía dentro de la ventana de gracia.
         const room = manager.reconnect(session);
         if (room) channels.join(session, room.code);
-        return { session: { name: session.name }, room: room ? snapshotOf(room, token) : null };
+        return { session: { name: session.name }, room: room ? snapshotOf(room, token) : null, server: { bot: manager.botAvailable } };
       },
     },
 
@@ -76,6 +76,14 @@ export function createHandlers({ manager, sessions, channels, detachSocket }) {
       run({ session, payload }) {
         const { room, role } = switchingRooms(session, () => manager.joinRoom(session, payload.code));
         return { role, room: snapshotOf(room, session.token) };
+      },
+    },
+
+    'bot:start': {
+      run({ session, payload }) {
+        const { level, color, clock } = payload;
+        const room = switchingRooms(session, () => manager.createBotRoom(session, { level, color, clock }));
+        return { code: room.code, room: snapshotOf(room, session.token) };
       },
     },
 

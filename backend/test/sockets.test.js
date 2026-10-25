@@ -105,7 +105,8 @@ describe('sesión e identidad', () => {
   test('inicia sesión con nombre propio y sin nombre (aleatorio)', async () => {
     const a = new Client('CaballoVeloz42');
     const res = await a.init();
-    assert.deepEqual(res, { ok: true, session: { name: 'CaballoVeloz42' }, room: null });
+    assert.deepEqual({ ...res, server: undefined }, { ok: true, session: { name: 'CaballoVeloz42' }, room: null, server: undefined });
+    assert.equal(typeof res.server.bot, 'boolean'); // el cliente sabe si hay bot disponible
 
     const b = new Client(undefined);
     const res2 = await b.init();

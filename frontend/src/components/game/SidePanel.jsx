@@ -30,7 +30,7 @@ function Tab({ id, active, onSelect, icon, children, badge }) {
 }
 
 /** Panel lateral con pestañas: Movimientos y Chat (con contador de mensajes sin leer). */
-export default function SidePanel({ room, viewPly, onView }) {
+export default function SidePanel({ room, viewPly, onView, chat = true }) {
   const { name } = useSession();
   const [tab, setTab] = useState('moves');
   // Lo que ya había al entrar (historial) cuenta como leído.
@@ -44,13 +44,18 @@ export default function SidePanel({ room, viewPly, onView }) {
   const unread = tab === 'chat' ? 0 : room.chat.filter((m) => m.id > seenId && !isMine(m, room, name)).length;
 
   return (
-    <section className="glass flex min-h-0 flex-1 flex-col overflow-hidden" aria-label="Movimientos y chat">
-      <div role="tablist" className="flex items-center gap-1 bg-surface-container-lowest/70 p-1.5">
+    <section className="glass flex min-h-0 flex-1 flex-col overflow-hidden" aria-label={chat ? 'Movimientos y chat' : 'Movimientos'}>
+      {!chat && (
+        <div className="flex items-center gap-1.5 bg-surface-container-lowest/70 px-4 py-3 font-headline-sm text-label-badge uppercase tracking-wider text-primary">
+          <Icon name="format_list_numbered" className="!text-base" /> Movimientos
+        </div>
+      )}
+      {chat && <div role="tablist" className="flex items-center gap-1 bg-surface-container-lowest/70 p-1.5">
         <Tab id="moves" active={tab === 'moves'} onSelect={setTab} icon="format_list_numbered">Movimientos</Tab>
         <Tab id="chat" active={tab === 'chat'} onSelect={setTab} icon="forum" badge={unread}>Chat</Tab>
-      </div>
-      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="flex min-h-0 flex-1 flex-col">
-        {tab === 'moves' ? <MoveList moves={room.moves} viewPly={viewPly} onView={onView} /> : <ChatPanel room={room} />}
+      </div>}
+      <div role={chat ? 'tabpanel' : undefined} id={`panel-${tab}`} aria-labelledby={chat ? `tab-${tab}` : undefined} className="flex min-h-0 flex-1 flex-col">
+        {tab === 'moves' || !chat ? <MoveList moves={room.moves} viewPly={viewPly} onView={onView} /> : <ChatPanel room={room} />}
       </div>
     </section>
   );

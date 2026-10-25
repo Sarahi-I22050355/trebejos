@@ -7,6 +7,7 @@ import { ERRORS } from '../utils/errors.js';
 import { generateCode, normalizeCode } from '../utils/codes.js';
 import { sanitizeChat } from '../utils/names.js';
 import { RateLimiter } from '../utils/rateLimit.js';
+import { LEVELS, isLevel } from '../bot/levels.js';
 
 const VISIBILITIES = ['public', 'private'];
 
@@ -16,9 +17,11 @@ export class RoomManager {
    * @param {ReturnType<import('../config.js').loadConfig>} deps.config
    * @param {import('./SessionStore.js').SessionStore} deps.sessions
    * @param {(room: Room, type: string, payload?: object) => void} [deps.notify]
+   * @param {import('../bot/BotService.js').BotService|null} [deps.bots]  motor del bot (opcional)
    */
-  constructor({ config, sessions, notify = () => {}, now = Date.now }) {
+  constructor({ config, sessions, notify = () => {}, now = Date.now, bots = null }) {
     this.config = config;
+    this.bots = bots;
     this.sessions = sessions;
     this.notify = notify;
     this.now = now;
@@ -26,6 +29,10 @@ export class RoomManager {
     this.rooms = new Map();
     this.chatLimiter = new RateLimiter(config.chatRateLimit, now);
     this.sweeper = null;
+  }
+
+  get botAvailable() {
+    return !!this.bots?.available;
   }
 
   // ------------------------------------------------------------------ helpers
@@ -75,16 +82,71 @@ export class RoomManager {
     return { initialMs: initial * 1000, incrementMs: increment * 1000 };
   }
 
-  #newRoom(code, visibility, clock) {
+  #newRoom(code, visibility, clock, bot = null) {
     const room = new Room({
       code,
       visibility,
       clock,
+      bot,
       now: this.now,
       chatHistory: this.config.chatHistory,
-      notify: (type, payload) => this.notify(room, type, payload),
+      notify: (type, payload) => {
+        this.notify(room, type, payload);
+        // Tras cada jugada (o al reiniciar la partida) puede tocarle mover al bot.
+        if (room.bot && (type === 'move' || type === 'state')) queueMicrotask(() => this.#botTurn(room));
+      },
     });
     return room;
+  }
+
+  // ------------------------------------------------------------------ bot
+
+  /** Crea una partida contra el bot: el humano en `color`, el bot en el otro, y arranca ya. */
+  createBotRoom(session, { level, color = 'random', clock = null } = {}) {
+    if (!this.botAvailable) throw ERRORS.botUnavailable();
+    if (!isLevel(level)) throw ERRORS.invalidOptions('Elige un nivel de dificultad.');
+    if (!['w', 'b', 'random'].includes(color)) throw ERRORS.invalidOptions('Color inválido.');
+    const clockConfig = this.#parseClock(clock);
+    this.#leaveBeforeStarting(session);
+    if (this.rooms.size >= this.config.maxRooms) throw ERRORS.serverBusy();
+
+    const code = generateCode((c) => this.rooms.has(c));
+    const humanColor = color === 'random' ? (randomInt(2) ? 'w' : 'b') : color;
+    const botColor = other(humanColor);
+    const bot = { level, label: LEVELS[level].label, color: botColor, token: `bot:${code}`, thinking: false };
+    const room = this.#newRoom(code, 'private', clockConfig, bot);
+    room.hostToken = session.token;
+    room.addPlayer(humanColor, session);
+    room.addBotSeat();
+    room.startGame();
+    this.rooms.set(code, room);
+    session.roomCode = code;
+    session.role = humanColor;
+    this.notify(room, 'created');
+    this.#botTurn(room); // si el bot juega con blancas, abre la partida
+    return room;
+  }
+
+  /** Si le toca al bot, calcula su jugada (sin bloquear) y la juega pasado un mínimo de "pensar". */
+  async #botTurn(room) {
+    const bot = room.bot;
+    if (!bot || bot.thinking || room.status !== STATUS.PLAYING || room.game.turn() !== bot.color) return;
+    bot.thinking = true;
+    const fen = room.game.fen();
+    const startedAt = Date.now();
+    try {
+      const remaining = room.clockConfig ? room.clockSnapshot()[`${bot.color}Ms`] : null;
+      const move = await this.bots.chooseMove(fen, bot.level, { remainingMs: remaining });
+      const wait = LEVELS[bot.level].minDelayMs - (Date.now() - startedAt);
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+      // Mientras pensaba pudieron rendirse, abandonar o cerrarse la sala.
+      if (!move || this.rooms.get(room.code) !== room || room.status !== STATUS.PLAYING || room.game.fen() !== fen) return;
+      room.move(bot.token, move);
+    } catch (err) {
+      console.warn(`[bot] no pudo mover en ${room.code}: ${err.message}`);
+    } finally {
+      bot.thinking = false;
+    }
   }
 
   // -------------------------------------------------------------- crear / unir
@@ -116,6 +178,8 @@ export class RoomManager {
 
     // Reintentar unirse a la sala donde ya estás es inofensivo.
     if (this.activeRoomOf(session) === room) return { room, role: session.role };
+
+    if (room.bot) throw ERRORS.roomNotFound(); // las partidas contra el bot son privadas
 
     this.#leaveBeforeStarting(session);
 
@@ -184,7 +248,7 @@ export class RoomManager {
   }
 
   #afterSeatLeft(room) {
-    if (room.activePlayers().length === 0) this.#closeRoom(room, 'empty');
+    if (room.humanPlayers().length === 0) this.#closeRoom(room, 'empty');
     else this.notify(room, 'state');
   }
 
@@ -322,6 +386,7 @@ export class RoomManager {
 
   sendChat(session, rawText) {
     const room = this.#requireRoom(session);
+    if (room.bot) throw ERRORS.badRequest('El chat no está disponible contra el bot.');
     if (!this.chatLimiter.allow(session.token)) throw ERRORS.rateLimited();
     const text = sanitizeChat(rawText, this.config.chatMaxLength);
     if (!text) throw ERRORS.badRequest('El mensaje está vacío.');

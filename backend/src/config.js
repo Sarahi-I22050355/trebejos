@@ -40,6 +40,15 @@ export function loadConfig(overrides = {}, env = process.env) {
     maxClockSeconds: 3 * 60 * 60,
     maxIncrementSeconds: 60,
 
+    // --- Bot (Stockfish por UCI) ---
+    botEnabled: bool(env.BOT_ENABLED, true),
+    // Ruta del binario; vacío = buscar `stockfish` en el PATH y en /usr/games (paquete de Debian).
+    stockfishPath: env.STOCKFISH_PATH || '',
+    stockfishArgs: [],
+    botEngines: num(env.BOT_ENGINES, 2), // procesos de Stockfish compartidos por todas las partidas
+    botQueueTimeoutMs: 8000,
+    botGraceMs: 4000, // margen extra sobre el tiempo de pensar antes de dar al motor por colgado
+
     // --- Lobby ---
     lobbyThrottleMs: 1000,
     lobbyHeartbeatMs: 5000,

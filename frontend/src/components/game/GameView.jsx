@@ -26,6 +26,7 @@ export default function GameView({ room }) {
   const { move, resign, offerDraw, respondDraw, leaveRoom } = useSession();
   const { notify } = useToast();
 
+  const isBot = room.mode === 'bot';
   const myColor = room.you.color;
   const isPlayer = !!myColor;
   const playing = room.status === 'playing';
@@ -160,23 +161,31 @@ export default function GameView({ room }) {
           </span>
         </div>
         <div className="flex items-center gap-space-md">
-          {!isPlayer && (
-            <span className="badge bg-secondary-container/30 text-secondary">
-              <Icon name="visibility" className="!text-sm" /> Espectador
+          {isBot ? (
+            <span className="badge bg-secondary-container/30 text-secondary" data-testid="bot-badge">
+              <Icon name="smart_toy" className="!text-sm" /> Stockfish · {room.bot.label}
             </span>
+          ) : (
+            <>
+              {!isPlayer && (
+                <span className="badge bg-secondary-container/30 text-secondary">
+                  <Icon name="visibility" className="!text-sm" /> Espectador
+                </span>
+              )}
+              <span className="flex items-center gap-1.5 font-mono-move text-mono-move text-on-surface-variant" title="Espectadores">
+                <Icon name="visibility" className="!text-base text-secondary" /> {room.spectators.count}
+              </span>
+              <button
+                type="button"
+                title="Copiar enlace de la sala"
+                aria-label="Copiar enlace de la sala"
+                onClick={async () => notify((await copyText(roomLink(room.code))) ? 'Enlace de la sala copiado' : 'No se pudo copiar', 'success')}
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-body-sm text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary"
+              >
+                <Icon name="link" className="!text-base" /> <span className="hidden sm:inline">Copiar enlace</span>
+              </button>
+            </>
           )}
-          <span className="flex items-center gap-1.5 font-mono-move text-mono-move text-on-surface-variant" title="Espectadores">
-            <Icon name="visibility" className="!text-base text-secondary" /> {room.spectators.count}
-          </span>
-          <button
-            type="button"
-            title="Copiar enlace de la sala"
-            aria-label="Copiar enlace de la sala"
-            onClick={async () => notify((await copyText(roomLink(room.code))) ? 'Enlace de la sala copiado' : 'No se pudo copiar', 'success')}
-            className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-body-sm text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary"
-          >
-            <Icon name="link" className="!text-base" /> <span className="hidden sm:inline">Copiar enlace</span>
-          </button>
         </div>
       </div>
 
@@ -212,11 +221,12 @@ export default function GameView({ room }) {
 
         <div className="flex flex-col gap-space-sm xl:col-span-4 xl:h-[calc(min(680px,max(320px,100dvh-15rem))+7.5rem)]">
           <div className="flex h-[22rem] min-h-0 flex-col xl:h-auto xl:flex-1">
-            <SidePanel room={room} viewPly={viewPly} onView={setViewPly} />
+            <SidePanel room={room} viewPly={viewPly} onView={setViewPly} chat={!isBot} />
           </div>
           <Commands
             isPlayer={isPlayer}
             playing={playing}
+            canDraw={!isBot}
             drawOfferedByMe={room.drawOffer === myColor && !!myColor}
             onDraw={doDraw}
             onResign={() => setResignOpen(true)}

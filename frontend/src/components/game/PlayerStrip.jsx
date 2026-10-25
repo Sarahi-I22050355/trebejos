@@ -1,4 +1,5 @@
 import Avatar from '../Avatar.jsx';
+import BotAvatar from '../BotAvatar.jsx';
 import Icon from '../Icon.jsx';
 import Piece from './Piece.jsx';
 import { formatClock } from '../../lib/clock.js';
@@ -53,7 +54,7 @@ export default function PlayerStrip({ seat, color, isYou, active, clockMs, gameO
       {active && <span className="absolute inset-y-0 left-0 w-1.5 bg-primary-container shadow-[0_0_12px_#00f0ff]" />}
       <div className="flex min-w-0 items-center gap-2.5 pl-1 sm:gap-3">
         <div className="relative">
-          <Avatar name={name} size={44} className="shadow-md" />
+          {seat?.isBot ? <BotAvatar size={44} className="shadow-md" /> : <Avatar name={name} size={44} className="shadow-md" />}
           <span
             className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-surface-container-low ${
               color === 'w' ? 'bg-white' : 'bg-surface-container-lowest ring-1 ring-white/40'
@@ -65,7 +66,18 @@ export default function PlayerStrip({ seat, color, isYou, active, clockMs, gameO
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="truncate font-headline-sm text-headline-sm text-on-surface">{name}</span>
             {isYou && <span className="rounded bg-primary-container/15 px-1.5 py-0.5 font-headline-sm text-label-badge uppercase text-primary-container">Tú</span>}
-            {active && !gameOver && (
+            {seat?.isBot && <span className="rounded bg-secondary-container/40 px-1.5 py-0.5 font-headline-sm text-label-badge uppercase text-secondary-fixed">Bot</span>}
+            {active && !gameOver && seat?.isBot && (
+              <span data-testid="bot-thinking" className="flex items-center gap-1.5 rounded-full bg-secondary-container/30 px-2 py-0.5 font-headline-sm text-label-badge font-bold uppercase tracking-wider text-secondary">
+                Pensando
+                <span className="inline-flex gap-0.5" aria-hidden="true">
+                  {[0, 0.15, 0.3].map((d) => (
+                    <span key={d} className="h-1 w-1 animate-bounce rounded-full bg-secondary" style={{ animationDelay: `${d}s` }} />
+                  ))}
+                </span>
+              </span>
+            )}
+            {active && !gameOver && !seat?.isBot && (
               <span className="animate-pulse rounded-full bg-primary-container/20 px-2 py-0.5 font-headline-sm text-label-badge font-bold uppercase tracking-wider text-primary-container">
                 {isYou ? 'Tu turno' : 'Su turno'}
               </span>
