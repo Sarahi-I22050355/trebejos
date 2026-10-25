@@ -1,0 +1,54 @@
+# Trebejos — una sola pieza (backend + frontend + Stockfish) publicada en el puerto 3000.
+#
+#   docker compose up -d --build
+#
+# No incluye `cloudflared`: el túnel ya corre aparte. Solo hay que apuntar su ruta a este servicio
+# (ver README, sección "Cloudflare Tunnel").
+services:
+  trebejos:
+    build: .
+    image: trebejos:latest
+    container_name: trebejos
+    restart: unless-stopped
+    init: true                  # tini como PID 1: recoge los procesos de Stockfish al apagar
+    stop_grace_period: 10s
+    ports:
+      # Solo se publica el 3000. Cambia TREBEJOS_BIND a 127.0.0.1 si el túnel corre en el mismo host (no en otro contenedor).
+      - "${TREBEJOS_BIND:-0.0.0.0}:${TREBEJOS_PORT:-3000}:3000"
+    environment:
+      PORT: "3000"
+      # --- Bot ---
+      BOT_ENABLED: "${BOT_ENABLED:-true}"
+      BOT_ENGINES: "${BOT_ENGINES:-2}"             # procesos de Stockfish compartidos (≈ 1 por núcleo libre)
+      # --- Partidas ---
+      RECONNECT_GRACE_SECONDS: "${RECONNECT_GRACE_SECONDS:-90}"
+      MIN_CLOCK_SECONDS: "${MIN_CLOCK_SECONDS:-15}"
+      MAX_ROOMS: "${MAX_ROOMS:-500}"
+      MAX_SPECTATORS_PER_ROOM: "${MAX_SPECTATORS_PER_ROOM:-50}"
+      ALLOW_PRIVATE_SPECTATORS: "${ALLOW_PRIVATE_SPECTATORS:-true}"
+      WAITING_ROOM_TTL_MINUTES: "${WAITING_ROOM_TTL_MINUTES:-30}"
+      FINISHED_ROOM_TTL_MINUTES: "${FINISHED_ROOM_TTL_MINUTES:-15}"
+      IDLE_ROOM_TTL_MINUTES: "${IDLE_ROOM_TTL_MINUTES:-120}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    # El servidor no escribe en disco (todo vive en memoria): el sistema de archivos puede ser de solo lectura.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+.git
+.gitignore
+.env
+*.log
+**/.DS_Store
+frontend/e2e
+backend/test
+backend/scripts
+README.md
+docker-compose.yml
+Dockerfile
