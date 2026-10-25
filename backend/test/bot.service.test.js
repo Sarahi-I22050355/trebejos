@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Chess } from 'chess.js';
-import { BotService, findStockfish, parseUci } from '../src/bot/BotService.js';
+import { BotService, describeMove, findStockfish, parseUci } from '../src/bot/BotService.js';
 import { LEVELS, LEVEL_IDS, isLevel } from '../src/bot/levels.js';
 import { loadConfig } from '../src/config.js';
 
@@ -47,6 +47,20 @@ describe('niveles', () => {
   test('parseUci entiende promociones', () => {
     assert.deepEqual(parseUci('e2e4'), { from: 'e2', to: 'e4', promotion: undefined });
     assert.deepEqual(parseUci('e7e8q'), { from: 'e7', to: 'e8', promotion: 'q' });
+  });
+});
+
+describe('descripción de jugadas para las pistas', () => {
+  test('movimiento simple, captura, enroque, coronación, jaque y mate', () => {
+    assert.equal(describeMove(START, { from: 'g1', to: 'f3' }).text, 'Mueve el caballo de g1 a f3');
+    assert.equal(describeMove('7k/8/8/3p4/4P3/8/8/K7 w - - 0 1', { from: 'e4', to: 'd5' }).text, 'Mueve el peón de e4 a d5 y captura el peón');
+    assert.equal(describeMove('4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1', { from: 'e1', to: 'g1' }).text, 'Enroca corto con el rey');
+    assert.equal(describeMove('4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1', { from: 'e1', to: 'c1' }).text, 'Enroca largo con el rey');
+    assert.equal(describeMove('7k/4P3/8/8/8/8/8/K7 w - - 0 1', { from: 'e7', to: 'e8', promotion: 'q' }).text, 'Mueve el peón de e7 a e8 y corónalo a la dama, dando jaque');
+    assert.equal(describeMove('4k3/8/8/8/8/8/8/R3K3 w - - 0 1', { from: 'a1', to: 'a8' }).text, 'Mueve la torre de a1 a a8, dando jaque');
+    const mate = describeMove('6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1', { from: 'a1', to: 'a8' });
+    assert.equal(mate.text, 'Mueve la torre de a1 a a8: ¡es jaque mate!');
+    assert.equal(mate.san, 'Ra8#');
   });
 });
 
@@ -97,6 +111,19 @@ describe('respaldo ante fallos del motor (motor falso)', () => {
     const second = await bot.chooseMove(START, 'beginner');
     assert.equal(second.source, 'engine');
     fs.rmSync(process.env.FAKE_UCI_MARKER, { force: true });
+  });
+
+  test('hint: devuelve la jugada del motor ya explicada', async () => {
+    const bot = await service('ok');
+    const h = await bot.hint(START);
+    assert.deepEqual([h.from, h.to, h.san, h.text], ['e2', 'e4', 'e4', 'Mueve el peón de e2 a e4']);
+  });
+
+  test('hint: si el motor falla, da una pista legal igualmente', async () => {
+    const bot = await service('crash');
+    const h = await bot.hint(START);
+    assert.ok(isLegal(START, h));
+    assert.match(h.text, /^Mueve /);
   });
 
   test('sin jugadas legales devuelve null (la partida ya habría terminado)', async () => {

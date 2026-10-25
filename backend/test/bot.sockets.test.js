@@ -131,7 +131,7 @@ describe('crear una partida contra el bot', () => {
     const { human, room } = await botGame({ level: 'intermediate', color: 'w' });
     assert.equal(room.mode, 'bot');
     assert.equal(room.status, 'playing');
-    assert.deepEqual(room.bot, { level: 'intermediate', label: 'Intermedio' });
+    assert.deepEqual(room.bot, { level: 'intermediate', label: 'Intermedio', practice: false });
     assert.equal(room.you.color, 'w');
     assert.equal(room.players.w.isBot, false);
     assert.equal(room.players.b.isBot, true);
@@ -298,6 +298,58 @@ describe('reconexión', () => {
     assert.equal(res.room.you.color, 'w');
     await back.waitFor('game:move', (m) => m.ply === 2 && m.color === 'b'); // la jugada del bot llega al socket nuevo
     assert.equal((await back.emit('game:move', { from: 'd2', to: 'd4' })).ok, true);
+  });
+});
+
+describe('práctica guiada con pistas', () => {
+  const practice = () => botGame({ level: 'beginner', color: 'w', practice: true });
+
+  test('la sala marca la práctica y la pista da una jugada legal explicada que se puede jugar', async () => {
+    const { human, room } = await practice();
+    assert.equal(room.bot.practice, true);
+    const res = await human.emit('bot:hint');
+    assert.equal(res.ok, true, JSON.stringify(res));
+    const { hint } = res;
+    assert.match(hint.text, /^(Mueve|Enroca)/);
+    assert.equal(hint.fen, new Chess().fen());
+    const g = new Chess();
+    assert.doesNotThrow(() => g.move({ from: hint.from, to: hint.to, promotion: hint.promotion ?? undefined }));
+    assert.equal((await human.emit('game:move', { from: hint.from, to: hint.to, promotion: hint.promotion ?? undefined })).ok, true);
+    await botMove(human, 2, 'b');
+    // otra pista en la nueva posición (ya es mi turno)
+    await sleep(1100); // evita el límite de frecuencia de pistas
+    const second = await human.emit('bot:hint');
+    assert.equal(second.ok, true);
+    assert.notEqual(second.hint.fen, hint.fen);
+  });
+
+  test('no hay pistas en partidas normales ni en salas ajenas', async () => {
+    const normal = await botGame({ level: 'beginner', color: 'w' });
+    assert.equal(normal.room.bot.practice, false);
+    assert.equal((await normal.human.emit('bot:hint')).error.code, 'BAD_REQUEST');
+    const outsider = await player('Fuera');
+    assert.equal((await outsider.emit('bot:hint')).error.code, 'NOT_IN_ROOM');
+    const pvp = await player('Pvp');
+    await pvp.emit('room:create', { visibility: 'private' });
+    assert.equal((await pvp.emit('bot:hint')).error.code, 'BAD_REQUEST');
+  });
+
+  test('solo en tu turno y con límite de frecuencia', async () => {
+    const { human } = await practice();
+    await human.emit('game:move', { from: 'e2', to: 'e4' });
+    assert.equal((await human.emit('bot:hint')).error.code, 'NOT_YOUR_TURN'); // piensa el bot
+    await botMove(human, 2, 'b');
+    const results = [];
+    for (let i = 0; i < 5; i++) results.push(await human.emit('bot:hint'));
+    assert.equal(results.filter((r) => r.ok).length, 3);
+    assert.equal(results.at(-1).error.code, 'RATE_LIMITED');
+  });
+
+  test('tras el final de la partida ya no se piden pistas', async () => {
+    const { human } = await practice();
+    await human.emit('game:resign');
+    await human.waitFor('game:over');
+    assert.equal((await human.emit('bot:hint')).error.code, 'GAME_NOT_ACTIVE');
   });
 });
 

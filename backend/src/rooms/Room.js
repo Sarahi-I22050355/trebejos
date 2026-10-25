@@ -373,7 +373,7 @@ export class Room {
       code: this.code,
       visibility: this.visibility,
       mode: this.mode,
-      bot: this.bot && { level: this.bot.level, label: this.bot.label },
+      bot: this.bot && { level: this.bot.level, label: this.bot.label, practice: !!this.bot.practice },
       status: this.status,
       serverTime: this.now(),
       createdAt: this.createdAt,

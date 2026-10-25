@@ -55,6 +55,7 @@ export function loadConfig(overrides = {}, env = process.env) {
     lowTimeMs: 10_000,
 
     // --- Anti-abuso ---
+    hintRateLimit: { max: 3, windowMs: 5000 },
     chatMaxLength: 300,
     chatRateLimit: { max: 5, windowMs: 5000 },
     eventRateLimit: { max: 40, windowMs: 1000 },

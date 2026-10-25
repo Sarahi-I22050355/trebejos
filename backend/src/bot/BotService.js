@@ -33,6 +33,25 @@ export function parseUci(uci) {
   return { from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci.length > 4 ? uci[4] : undefined };
 }
 
+const HINT_PARAMS = { skill: 20, depth: 14, movetimeMs: 500 };
+
+const PIECE_ES = { p: 'el peón', n: 'el caballo', b: 'el alfil', r: 'la torre', q: 'la dama', k: 'el rey' };
+
+/** Explica una jugada en español a partir de la posición: captura, enroque, coronación, jaque… */
+export function describeMove(fen, { from, to, promotion }) {
+  const game = new Chess(fen);
+  const move = game.move({ from, to, promotion });
+  let text;
+  if (move.flags.includes('k')) text = 'Enroca corto con el rey';
+  else if (move.flags.includes('q')) text = 'Enroca largo con el rey';
+  else text = `Mueve ${PIECE_ES[move.piece]} de ${move.from} a ${move.to}`;
+  if (move.captured) text += ` y captura ${PIECE_ES[move.captured]}`;
+  if (move.promotion) text += ` y corónalo a ${PIECE_ES[move.promotion]}`;
+  if (game.isCheckmate()) text += ': ¡es jaque mate!';
+  else if (game.inCheck()) text += ', dando jaque';
+  return { san: move.san, text };
+}
+
 function randomLegalMove(fen) {
   const moves = new Chess(fen).moves({ verbose: true });
   if (moves.length === 0) return null;
@@ -85,11 +104,23 @@ export class BotService {
   async chooseMove(fen, levelId, { remainingMs = null } = {}) {
     const level = LEVELS[levelId];
     const budget = remainingMs == null ? level.movetimeMs : Math.max(30, Math.min(level.movetimeMs, remainingMs / 30));
+    return this.#search(fen, { skill: level.skill, depth: level.depth, movetimeMs: Math.round(budget) });
+  }
+
+  /**
+   * Pista para la práctica guiada: la mejor jugada según el motor a plena fuerza, explicada en
+   * español ("Mueve el caballo de g1 a f3, dando jaque"). Igual que chooseMove, nunca falla.
+   */
+  async hint(fen) {
+    const move = await this.#search(fen, HINT_PARAMS);
+    return move && { ...move, ...describeMove(fen, move) };
+  }
+
+  async #search(fen, { skill, depth, movetimeMs }) {
     try {
       if (!this.available) throw new Error('motor no disponible');
-      const movetimeMs = Math.round(budget);
       const uci = await this.pool.search({
-        fen, skill: level.skill, depth: level.depth, movetimeMs, timeoutMs: movetimeMs + this.config.botGraceMs,
+        fen, skill, depth, movetimeMs, timeoutMs: movetimeMs + this.config.botGraceMs,
       });
       const move = parseUci(uci);
       const legal = new Chess(fen).moves({ verbose: true });

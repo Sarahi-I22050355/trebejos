@@ -10,6 +10,32 @@ import {
 const PROMOTIONS = ['q', 'r', 'b', 'n'];
 const PROMOTION_LABEL = { q: 'Dama', r: 'Torre', b: 'Alfil', n: 'Caballo' };
 const DRAG_THRESHOLD = 5; // px antes de considerar que es un arrastre y no un clic
+const MARK_STYLE = {
+  hint: 'ring-secondary bg-secondary/25 animate-pulse',
+  success: 'ring-primary-container bg-primary-container/25',
+  wrong: 'ring-magenta bg-magenta/30',
+};
+
+/** Puntos de una flecha entre dos celdas (coordenadas 0–8). El caballo hace una "L": 2 casillas y luego 1. */
+function arrowPoints(a, b) {
+  const [x1, y1] = [a.x + 0.5, a.y + 0.5];
+  const [x2, y2] = [b.x + 0.5, b.y + 0.5];
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const isL = (Math.abs(dx) === 2 && Math.abs(dy) === 1) || (Math.abs(dx) === 1 && Math.abs(dy) === 2);
+  // Acorta el último tramo para que la punta quede dentro de la casilla destino, sin tapar la pieza.
+  const trim = (px, py, qx, qy, by = 0.28) => {
+    const len = Math.hypot(qx - px, qy - py) || 1;
+    return [qx - ((qx - px) / len) * by, qy - ((qy - py) / len) * by];
+  };
+  if (isL) {
+    const [cx, cy] = Math.abs(dx) === 2 ? [x2, y1] : [x1, y2]; // primero el tramo largo
+    const [ex, ey] = trim(cx, cy, x2, y2);
+    return `${x1},${y1} ${cx},${cy} ${ex},${ey}`;
+  }
+  const [ex, ey] = trim(x1, y1, x2, y2);
+  return `${x1},${y1} ${ex},${ey}`;
+}
 
 /**
  * @param {object} props
@@ -21,8 +47,17 @@ const DRAG_THRESHOLD = 5; // px antes de considerar que es un arrastre y no un c
  * @param {boolean} props.interactive  el usuario puede mover ahora
  * @param {'w'|'b'|null} props.myColor
  * @param {(from:string,to:string,promotion?:string)=>void} props.onMove
+ * @param {(from:string,to:string|null)=>void} [props.onIllegal]  intento de jugada imposible (lecciones);
+ *        `to === null` = se tocó una pieza que no se puede mover en este ejercicio
+ * @param {string[]|null} [props.selectable]  casillas de las piezas que se pueden coger (null = todas las propias)
+ * @param {string|null} [props.demoSquare]    muestra los movimientos legales de esa pieza sin seleccionarla
+ * @param {{from:string,to:string}[]} [props.arrows]  flechas (el caballo se dibuja en L)
+ * @param {{square:string,tone:'hint'|'success'|'wrong'}[]} [props.marks]  casillas resaltadas
  */
-export default function Board({ fen, orientation = 'w', lastMove, showCheck, checkBadge = false, interactive, myColor, onMove, children }) {
+export default function Board({
+  fen, orientation = 'w', lastMove, showCheck, checkBadge = false, interactive, myColor, onMove,
+  onIllegal, selectable = null, demoSquare = null, arrows = [], marks = [], children,
+}) {
   const gridRef = useRef(null);
   const prev = useRef({ pieces: [], fen: null });
   const down = useRef(null);
@@ -51,6 +86,13 @@ export default function Board({ fen, orientation = 'w', lastMove, showCheck, che
   const checkSquare = showCheck ? kingSquare(fen, turn) : null;
   const legal = useMemo(() => (selected && interactive ? legalMovesFrom(fen, selected) : []), [selected, fen, interactive]);
   const targets = useMemo(() => new Map(legal.map((m) => [m.to, m])), [legal]);
+  // Lo que se pinta (puntos y anillos): la selección del usuario o, si no hay, la demostración.
+  const shownMoves = useMemo(
+    () => (legal.length ? legal : demoSquare ? legalMovesFrom(fen, demoSquare) : []),
+    [legal, demoSquare, fen],
+  );
+  const shown = useMemo(() => new Map(shownMoves.map((m) => [m.to, m])), [shownMoves]);
+  const markTone = useMemo(() => new Map(marks.map((m) => [m.square, m.tone])), [marks]);
 
   const toCell = (square) => {
     const f = fileOf(square);
@@ -68,7 +110,11 @@ export default function Board({ fen, orientation = 'w', lastMove, showCheck, che
 
   function attemptMove(from, to) {
     const options = legalMovesFrom(fen, from).filter((m) => m.to === to);
-    if (options.length === 0) return false;
+    if (options.length === 0) {
+      onIllegal?.(from, to);
+      setSelected(null);
+      return false;
+    }
     if (options.some((m) => m.promotion)) {
       setPromo({ from, to });
       return true;
@@ -87,7 +133,13 @@ export default function Board({ fen, orientation = 'w', lastMove, showCheck, che
       return;
     }
     const mine = pieces.find((p) => p.square === square && p.color === myColor);
+    if (mine && selectable && !selectable.includes(square)) {
+      setSelected(null);
+      onIllegal?.(square, null); // pieza que no toca mover en este ejercicio
+      return;
+    }
     if (!mine) {
+      if (selected && square !== selected) onIllegal?.(selected, square);
       setSelected(null);
       return;
     }
@@ -129,12 +181,14 @@ export default function Board({ fen, orientation = 'w', lastMove, showCheck, che
     for (let x = 0; x < 8; x++) {
       const square = toSquare(x, y);
       const dark = (fileOf(square) + rankOf(square) - 1) % 2 === 0;
-      const isTarget = targets.has(square);
-      const isCapture = isTarget && (targets.get(square).flags.includes('c') || targets.get(square).flags.includes('e'));
+      const isTarget = shown.has(square);
+      const isCapture = isTarget && (shown.get(square).flags.includes('c') || shown.get(square).flags.includes('e'));
+      const tone = markTone.get(square);
       const isLast = lastMove && (lastMove.from === square || lastMove.to === square);
       squares.push(
         <div key={square} data-square={square} data-legal={isTarget ? (isCapture ? 'capture' : 'move') : undefined} className="relative" style={{ background: dark ? '#1E2235' : '#323B54' }}>
           {isLast && <span className="absolute inset-0 bg-primary-container/25 shadow-[inset_0_0_18px_rgba(0,240,255,0.4)]" />}
+          {tone && <span data-mark={tone} className={`absolute inset-0 ring-[3px] ring-inset ${MARK_STYLE[tone]}`} />}
           {selected === square && <span className="absolute inset-0 bg-primary-container/35 ring-2 ring-inset ring-primary-container" />}
           {checkSquare === square && <span className="absolute inset-0 animate-pulse bg-magenta/45 shadow-[inset_0_0_20px_rgba(236,72,153,0.7)]" />}
           {isTarget && !isCapture && (
@@ -189,6 +243,32 @@ export default function Board({ fen, orientation = 'w', lastMove, showCheck, che
             );
           })}
         </div>
+
+        {arrows.length > 0 && (
+          <svg viewBox="0 0 8 8" className="pointer-events-none absolute inset-0 z-20 h-full w-full" data-testid="arrows" aria-hidden="true">
+            <defs>
+              <marker id="arrowhead" markerWidth="4" markerHeight="4" refX="2.6" refY="2" orient="auto">
+                <polygon points="0 0, 4 2, 0 4" fill="#00F0FF" />
+              </marker>
+            </defs>
+            {arrows.map((a, i) => (
+              <polyline
+                key={`${a.from}${a.to}${i}`}
+                data-arrow={`${a.from}${a.to}`}
+                points={arrowPoints(toCell(a.from), toCell(a.to))}
+                fill="none"
+                stroke="#00F0FF"
+                strokeWidth="0.09"
+                strokeDasharray="0.22 0.14"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                opacity="0.9"
+                markerEnd="url(#arrowhead)"
+                style={{ filter: 'drop-shadow(0 0 0.08px #00F0FF)' }}
+              />
+            ))}
+          </svg>
+        )}
 
         {checkBadge && checkSquare && (() => {
           const { x, y } = toCell(checkSquare);

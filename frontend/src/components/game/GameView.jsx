@@ -10,12 +10,14 @@ import Commands, { DrawOffer } from './Commands.jsx';
 import Icon from '../Icon.jsx';
 import Modal from '../Modal.jsx';
 import PingDot from '../PingDot.jsx';
+import TutorCard from '../learn/TutorCard.jsx';
 import PresenceBanner from '../PresenceBanner.jsx';
 import { useSession } from '../../context/SessionContext.jsx';
 import { useToast } from '../Toasts.jsx';
 import { useServerNow } from '../../hooks/useNow.js';
 import { capturedBy, describeResult, positionAt } from '../../lib/board.js';
 import { describeClock } from '../../lib/clock.js';
+import { describeMoveEs } from '../../lib/learn.js';
 import { copyText } from '../../lib/clipboard.js';
 import { roomLink } from '../../lib/code.js';
 
@@ -23,10 +25,11 @@ const other = (c) => (c === 'w' ? 'b' : 'w');
 
 export default function GameView({ room }) {
   const navigate = useNavigate();
-  const { move, resign, offerDraw, respondDraw, leaveRoom } = useSession();
+  const { move, resign, offerDraw, respondDraw, leaveRoom, hint: requestHint } = useSession();
   const { notify } = useToast();
 
   const isBot = room.mode === 'bot';
+  const practice = !!room.bot?.practice; // partida guiada: con pistas del tutor
   const myColor = room.you.color;
   const isPlayer = !!myColor;
   const playing = room.status === 'playing';
@@ -39,6 +42,8 @@ export default function GameView({ room }) {
   const [resignOpen, setResignOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [resultDismissed, setResultDismissed] = useState(false);
+  const [hint, setHint] = useState(null); // { from, to, text } de la última pista pedida
+  const [hinting, setHinting] = useState(false);
 
   const live = viewPly == null;
   const bottom = flipped ? other(myColor ?? 'w') : myColor ?? 'w';
@@ -47,6 +52,7 @@ export default function GameView({ room }) {
   // El servidor confirmó (o cambió) la posición: ya no hace falta la jugada provisional.
   useEffect(() => {
     setPending(null);
+    setHint(null); // la pista era para la posición anterior
   }, [room.ply, room.status]);
   useEffect(() => {
     setResultDismissed(false);
@@ -64,6 +70,7 @@ export default function GameView({ room }) {
           : null;
   const interactive = isPlayer && playing && live && !pending && room.turn === myColor;
   const inCheck = live && !pending && room.inCheck;
+  const hintVisible = !!hint && live && !pending && interactive;
 
   // Navegación del historial con el teclado.
   useEffect(() => {
@@ -109,6 +116,15 @@ export default function GameView({ room }) {
   const summary = room.status === 'finished' ? describeResult(room.result, room.players, myColor) : null;
   const clockInfo = describeClock(clock.enabled ? clock : null);
   const lastSan = room.moves.at(-1)?.san;
+  const lastMove = room.moves.at(-1);
+  const tutorTone = hintVisible ? 'hint' : 'info';
+  const tutorText = hintVisible
+    ? hint.text
+    : lastMove && lastMove.color !== myColor && live
+      ? `El bot jugó ${lastMove.san}: ${describeMoveEs(lastMove)} ¿Y tú? Si necesitas ayuda, pide una pista.`
+      : playing
+        ? 'Juegas con las blancas. Piensa tu jugada y, si te atascas, pide una pista.'
+        : 'La partida terminó. Puedes jugar otra vez o volver a las lecciones.';
 
   function leave() {
     setLeaveOpen(false);
@@ -120,6 +136,14 @@ export default function GameView({ room }) {
     setResignOpen(false);
     const res = await resign();
     if (!res.ok) notify(res.error.message, 'error');
+  }
+
+  async function askHint() {
+    setHinting(true);
+    const res = await requestHint();
+    setHinting(false);
+    if (res.ok) setHint({ from: res.hint.from, to: res.hint.to, text: res.hint.text });
+    else notify(res.error.message, 'error');
   }
 
   async function doDraw() {
@@ -163,7 +187,7 @@ export default function GameView({ room }) {
         <div className="flex items-center gap-space-md">
           {isBot ? (
             <span className="badge bg-secondary-container/30 text-secondary" data-testid="bot-badge">
-              <Icon name="smart_toy" className="!text-sm" /> Stockfish · {room.bot.label}
+              <Icon name="smart_toy" className="!text-sm" /> {practice ? 'Práctica guiada' : 'Stockfish'} · {room.bot.label}
             </span>
           ) : (
             <>
@@ -207,6 +231,8 @@ export default function GameView({ room }) {
               interactive={interactive}
               myColor={myColor}
               onMove={handleMove}
+              marks={hintVisible ? [{ square: hint.from, tone: 'hint' }, { square: hint.to, tone: 'hint' }] : []}
+              arrows={hintVisible ? [{ from: hint.from, to: hint.to }] : []}
             >
               {summary && !resultDismissed && <GameResult room={room} summary={summary} onClose={() => setResultDismissed(true)} onLeave={leave} />}
             </Board>
@@ -223,7 +249,11 @@ export default function GameView({ room }) {
           <div className="flex h-[22rem] min-h-0 flex-col xl:h-auto xl:flex-1">
             <SidePanel room={room} viewPly={viewPly} onView={setViewPly} chat={!isBot} />
           </div>
+          {practice && <TutorCard tone={tutorTone}>{tutorText}</TutorCard>}
           <Commands
+            canHint={practice && interactive && !hinting}
+            showHint={practice}
+            onHint={askHint}
             isPlayer={isPlayer}
             playing={playing}
             canDraw={!isBot}

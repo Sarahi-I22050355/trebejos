@@ -21,7 +21,7 @@ El navegador genera un UUID (`crypto.randomUUID()`), lo guarda en `localStorage`
 
 | Evento | Payload | Ack (`ok: true`) |
 |---|---|---|
-| `session:init` | `{ token, name? }` | `{ session: { name }, room: Snapshot \| null }` |
+| `session:init` | `{ token, name? }` | `{ session: { name }, room: Snapshot \| null, server: { bot: boolean } }` |
 | `session:rename` | `{ name }` | `{ name }` (error `NAME_LOCKED` si estás en una sala) |
 
 `session:init` debe ser el primer evento. Si la sesión seguía dentro de una sala (dentro de la ventana
@@ -88,6 +88,26 @@ no tiene material para dar mate, son tablas (`timeout-insufficient`).
 
 El texto es plano (sin HTML). El historial (últimos 100) viaja dentro del `Snapshot`.
 
+## Bot (Stockfish)
+
+`server.bot` en la respuesta de `session:init` indica si el servidor tiene Stockfish disponible.
+
+| Evento | Payload | Ack |
+|---|---|---|
+| `bot:start` | `{ level: 'beginner'\|'intermediate'\|'advanced'\|'expert', color?: 'w'\|'b'\|'random', clock?: {...}\|null, practice?: boolean }` | `{ code, room }` |
+| `bot:hint` | — | `{ hint: { from, to, promotion, san, text, fen } }` |
+
+- Una partida contra el bot es una sala normal con `mode: 'bot'`, `bot: { level, label, practice }` y un
+  asiento con `isBot: true`. Es **privada**: no sale en el listado, nadie más puede entrar (`ROOM_NOT_FOUND`)
+  y no hay chat ni tablas (`BAD_REQUEST`).
+- El bot responde con los eventos de siempre (`game:move`, `game:over`). Si juega con blancas, abre solo.
+  El tiempo de respuesta máximo es de pocos segundos (ver `backend/src/bot/levels.js`).
+- `game:rematch` del humano basta: el bot acepta siempre y los colores se invierten.
+- Si el motor falla, el bot juega una jugada legal de respaldo: la partida nunca se queda colgada.
+- `practice: true` (partida guiada) habilita `bot:hint`: la mejor jugada para el humano, **solo en su turno**,
+  con un texto en español ("Mueve el caballo de g1 a f3, dando jaque"). Límite: 3 pistas / 5 s.
+  En partidas normales `bot:hint` responde `BAD_REQUEST`.
+
 ## Salas públicas
 
 | Evento | Payload | Ack |
@@ -135,7 +155,7 @@ Snapshot = {
 `NO_SESSION`, `INVALID_TOKEN`, `INVALID_NAME`, `NAME_LOCKED`, `INVALID_CODE`, `ROOM_NOT_FOUND`,
 `ROOM_FULL`, `SERVER_BUSY`, `INVALID_OPTIONS`, `ALREADY_IN_GAME`, `NOT_IN_ROOM`, `NOT_PLAYER`,
 `NOT_HOST`, `GAME_NOT_ACTIVE`, `GAME_OVER`, `NOT_YOUR_TURN`, `ILLEGAL_MOVE`, `REMATCH_UNAVAILABLE`,
-`NO_WAITING_ROOMS`, `RATE_LIMITED` (40 eventos/s por conexión), `BAD_REQUEST`, `INTERNAL`.
+`NO_WAITING_ROOMS`, `BOT_UNAVAILABLE`, `RATE_LIMITED` (40 eventos/s por conexión), `BAD_REQUEST`, `INTERNAL`.
 
 ## Reconexión
 

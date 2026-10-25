@@ -202,6 +202,7 @@ export function SessionProvider({ children }) {
       respondDraw: (accept) => request('game:respondDraw', { accept }),
       rematch: () => request('game:rematch'),
       sendChat: (text) => request('chat:send', { text }),
+      hint: () => request('bot:hint'),
       leaveRoom: async () => {
         // Se sale de inmediato en la interfaz (sin esperar al servidor): evita que el chip "En sala"
         // parpadee tras volver al inicio. Si el servidor rechazara salir, el próximo room:state lo corrige.

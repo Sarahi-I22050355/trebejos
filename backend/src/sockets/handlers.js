@@ -81,9 +81,15 @@ export function createHandlers({ manager, sessions, channels, detachSocket }) {
 
     'bot:start': {
       run({ session, payload }) {
-        const { level, color, clock } = payload;
-        const room = switchingRooms(session, () => manager.createBotRoom(session, { level, color, clock }));
+        const { level, color, clock, practice } = payload;
+        const room = switchingRooms(session, () => manager.createBotRoom(session, { level, color, clock, practice }));
         return { code: room.code, room: snapshotOf(room, session.token) };
+      },
+    },
+
+    'bot:hint': {
+      async run({ session }) {
+        return { hint: await manager.hint(session) };
       },
     },
 

@@ -30,13 +30,18 @@ export function DrawOffer({ name, onAccept, onDecline }) {
 }
 
 /** Panel de comandos: cambia según seas jugador, espectador o la partida haya terminado. */
-export default function Commands({ isPlayer, playing, canDraw = true, drawOfferedByMe, onDraw, onResign, onFlip, onLeave }) {
+export default function Commands({ isPlayer, playing, canDraw = true, showHint = false, canHint = false, onHint, drawOfferedByMe, onDraw, onResign, onFlip, onLeave }) {
   return (
     <section className="glass flex flex-col gap-2 p-space-md" aria-label="Comandos de partida">
       <div className="pb-1 font-mono-move text-[11px] uppercase tracking-widest text-outline">Comandos de partida</div>
       <div className="grid grid-cols-2 gap-2">
         {isPlayer && playing && (
           <>
+            {showHint && (
+              <Command icon="lightbulb" tone="text-secondary" onClick={onHint} disabled={!canHint} data-testid="btn-hint">
+                Pista
+              </Command>
+            )}
             {canDraw && (
               <Command icon="handshake" tone="text-primary" onClick={onDraw} disabled={drawOfferedByMe} data-testid="btn-draw">
                 {drawOfferedByMe ? 'Tablas ofrecidas' : 'Ofrecer tablas'}

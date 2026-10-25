@@ -28,6 +28,7 @@ export class RoomManager {
     /** @type {Map<string, Room>} */
     this.rooms = new Map();
     this.chatLimiter = new RateLimiter(config.chatRateLimit, now);
+    this.hintLimiter = new RateLimiter(config.hintRateLimit, now);
     this.sweeper = null;
   }
 
@@ -102,7 +103,7 @@ export class RoomManager {
   // ------------------------------------------------------------------ bot
 
   /** Crea una partida contra el bot: el humano en `color`, el bot en el otro, y arranca ya. */
-  createBotRoom(session, { level, color = 'random', clock = null } = {}) {
+  createBotRoom(session, { level, color = 'random', clock = null, practice = false } = {}) {
     if (!this.botAvailable) throw ERRORS.botUnavailable();
     if (!isLevel(level)) throw ERRORS.invalidOptions('Elige un nivel de dificultad.');
     if (!['w', 'b', 'random'].includes(color)) throw ERRORS.invalidOptions('Color inválido.');
@@ -113,7 +114,7 @@ export class RoomManager {
     const code = generateCode((c) => this.rooms.has(c));
     const humanColor = color === 'random' ? (randomInt(2) ? 'w' : 'b') : color;
     const botColor = other(humanColor);
-    const bot = { level, label: LEVELS[level].label, color: botColor, token: `bot:${code}`, thinking: false };
+    const bot = { level, label: LEVELS[level].label, color: botColor, token: `bot:${code}`, thinking: false, practice: practice === true };
     const room = this.#newRoom(code, 'private', clockConfig, bot);
     room.hostToken = session.token;
     room.addPlayer(humanColor, session);
@@ -391,6 +392,21 @@ export class RoomManager {
     const text = sanitizeChat(rawText, this.config.chatMaxLength);
     if (!text) throw ERRORS.badRequest('El mensaje está vacío.');
     return room.addChat({ name: session.name, role: session.role }, text);
+  }
+
+  /** Pista de la práctica guiada: mejor jugada explicada. Solo en salas `practice` y en tu turno. */
+  async hint(session) {
+    const room = this.#requireRoom(session);
+    if (!room.bot?.practice) throw ERRORS.badRequest('Las pistas solo están disponibles en la práctica guiada.');
+    if (room.status !== STATUS.PLAYING) throw ERRORS.gameNotActive();
+    const color = room.colorOf(session.token);
+    if (!color) throw ERRORS.notPlayer();
+    if (room.game.turn() !== color) throw ERRORS.notYourTurn();
+    if (!this.hintLimiter.allow(session.token)) throw ERRORS.rateLimited();
+    const fen = room.game.fen();
+    const hint = await this.bots.hint(fen);
+    if (!hint) throw ERRORS.gameNotActive();
+    return { from: hint.from, to: hint.to, promotion: hint.promotion ?? null, san: hint.san, text: hint.text, fen };
   }
 
   // ------------------------------------------------------------------- lobby

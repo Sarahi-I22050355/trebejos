@@ -72,7 +72,10 @@ async function waitCount(locator, n, timeout = 5000) {
     await dialog.getByRole('button', { name: /Crear sala/ }).click();
     await host.page.waitForURL(/\/sala\/[A-Z2-9]{6}$/);
     const code = host.page.url().split('/').pop();
-    for (const p of [guest.page, spec.page]) await p.goto(`${BASE}/sala/${code}`);
+    // En orden: el primero en llegar juega con negras; solo el siguiente entra como espectador.
+    await guest.page.goto(`${BASE}/sala/${code}`);
+    await guest.page.getByTestId('board').waitFor();
+    await spec.page.goto(`${BASE}/sala/${code}`);
     for (const p of [host.page, guest.page, spec.page]) await p.getByTestId('board').waitFor();
     step(`partida ${code} con dos jugadores y un espectador`);
 
