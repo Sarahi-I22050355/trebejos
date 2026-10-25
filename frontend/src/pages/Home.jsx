@@ -39,7 +39,7 @@ export default function Home() {
   const navigate = useNavigate();
   const { notify } = useToast();
   const { status, name, room, rename, createRoom, startBot, features } = useSession();
-  const lobby = useLobby();
+  const { lobby } = useLobby();
   const online = status === 'online';
 
   const [draft, setDraft] = useState(name);

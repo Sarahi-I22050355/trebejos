@@ -21,11 +21,14 @@ export function describeClock(clock) {
   if (!clock) return { short: 'Sin reloj', category: { id: 'none', label: 'Sin reloj', icon: 'all_inclusive' }, long: 'Sin límite de tiempo' };
   const minutes = clock.initialMs / 60_000;
   const seconds = clock.incrementMs / 1000;
-  const minutesLabel = Number.isInteger(minutes) ? String(minutes) : minutes.toFixed(1);
+  // Bajo un minuto se cuenta en segundos ("30 s"), no en fracciones de minuto.
+  const subMinute = minutes < 1;
+  const baseShort = subMinute ? `${clock.initialMs / 1000}s` : Number.isInteger(minutes) ? String(minutes) : minutes.toFixed(1);
+  const baseLong = subMinute ? `${clock.initialMs / 1000} s` : `${baseShort} min`;
   return {
-    short: `${minutesLabel}+${seconds}`,
+    short: `${baseShort}+${seconds}`,
     category: clockCategory(clock.initialMs),
-    long: `${minutesLabel} min${seconds ? ` + ${seconds} s de incremento` : ' sin incremento'}`,
+    long: `${baseLong}${seconds ? ` + ${seconds} s de incremento` : ' sin incremento'}`,
   };
 }
 

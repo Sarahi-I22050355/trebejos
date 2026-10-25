@@ -30,6 +30,8 @@ test('relojes', () => {
   assert.equal(formatClock(7_340, { tenths: true }), '0:07.3');
   assert.equal(formatClock(-5), '0:00');
   assert.equal(describeClock({ initialMs: 180_000, incrementMs: 2000 }).short, '3+2');
+  assert.equal(describeClock({ initialMs: 30_000, incrementMs: 0 }).short, '30s+0');
+  assert.equal(describeClock({ initialMs: 30_000, incrementMs: 0 }).long, '30 s sin incremento');
   assert.equal(describeClock(null).short, 'Sin reloj');
   assert.deepEqual(['60000', '180000', '300000', '600000', '900000'].map((ms) => clockCategory(+ms).label),
     ['Bala', 'Blitz', 'Blitz', 'Rápida', 'Clásica']);

@@ -15,14 +15,17 @@ const COLORS = [
 ];
 const CLOCKS = CLOCK_PRESETS.map((p) => ({ value: p.id, label: p.label }));
 
-export default function CreateRoomDialog({ open, onClose, onCreate, busy, initialClock = 'none' }) {
-  const [visibility, setVisibility] = useState('private');
+export default function CreateRoomDialog({ open, onClose, onCreate, busy, initialClock = 'none', initialVisibility = 'private' }) {
+  const [visibility, setVisibility] = useState(initialVisibility);
   const [color, setColor] = useState('random');
   const [clockId, setClockId] = useState(initialClock);
 
   useEffect(() => {
-    if (open) setClockId(initialClock);
-  }, [open, initialClock]);
+    if (open) {
+      setClockId(initialClock);
+      setVisibility(initialVisibility);
+    }
+  }, [open, initialClock, initialVisibility]);
 
   const submit = (e) => {
     e.preventDefault();
