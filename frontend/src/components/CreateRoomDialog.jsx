@@ -1,0 +1,83 @@
+import { useEffect, useState } from 'react';
+import Modal from './Modal.jsx';
+import Segmented from './Segmented.jsx';
+import Icon from './Icon.jsx';
+import { CLOCK_PRESETS } from '../lib/clock.js';
+import { msg } from '../i18n/core.js';
+import { useI18n } from '../i18n/useI18n.js';
+
+const VISIBILITY = [
+  { value: 'private', label: msg('Privada'), icon: 'lock', description: msg('Solo con el código') },
+  { value: 'public', label: msg('Pública'), icon: 'public', description: msg('Aparece en el listado') },
+];
+const COLORS = [
+  { value: 'w', label: msg('Blancas'), icon: 'light_mode' },
+  { value: 'b', label: msg('Negras'), icon: 'dark_mode' },
+  { value: 'random', label: msg('Aleatorio'), icon: 'shuffle' },
+];
+const CLOCKS = CLOCK_PRESETS.map((p) => ({ value: p.id, label: p.label }));
+
+export default function CreateRoomDialog({ open, onClose, onCreate, busy, initialClock = 'none', initialVisibility = 'private' }) {
+  const { t } = useI18n();
+  const [visibility, setVisibility] = useState(initialVisibility);
+  const [color, setColor] = useState('random');
+  const [clockId, setClockId] = useState(initialClock);
+
+  useEffect(() => {
+    if (open) {
+      setClockId(initialClock);
+      setVisibility(initialVisibility);
+    }
+  }, [open, initialClock, initialVisibility]);
+
+  const submit = (e) => {
+    e.preventDefault();
+    const preset = CLOCK_PRESETS.find((p) => p.id === clockId);
+    onCreate({ visibility, color, clock: preset?.clock ?? null });
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('Crear sala')}
+      icon="add_box"
+      footer={
+        <>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={onClose}>
+            {t('Cancelar')}
+          </button>
+          <button type="submit" form="create-room-form" className="btn btn-primary" disabled={busy}>
+            <Icon name={busy ? 'progress_activity' : 'swords'} className={busy ? 'animate-spin' : ''} />
+            {busy ? t('Creando…') : t('Crear sala')}
+          </button>
+        </>
+      }
+    >
+      <form id="create-room-form" onSubmit={submit} className="flex flex-col gap-5">
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 font-label-badge text-label-badge uppercase tracking-[0.08em] text-on-surface-variant">
+            {t('Visibilidad')}
+          </legend>
+          <Segmented label={msg('Visibilidad')} options={VISIBILITY} value={visibility} onChange={setVisibility} />
+        </fieldset>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 font-label-badge text-label-badge uppercase tracking-[0.08em] text-on-surface-variant">
+            {t('Tu color')}
+          </legend>
+          <Segmented label={msg('Tu color')} options={COLORS} value={color} onChange={setColor} compact />
+        </fieldset>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 font-label-badge text-label-badge uppercase tracking-[0.08em] text-on-surface-variant">
+            {t('Reloj (minutos + incremento en segundos)')}
+          </legend>
+          <Segmented label={msg('Reloj')} options={CLOCKS} value={clockId} onChange={setClockId} columns={5} compact />
+        </fieldset>
+        <p className="flex items-start gap-2 text-body-sm text-on-surface-variant">
+          <Icon name="info" className="!text-base text-primary-container" />
+          {t('La partida empieza sola cuando entre tu rival. Si alguien más entra después, lo hará como espectador.')}
+        </p>
+      </form>
+    </Modal>
+  );
+}

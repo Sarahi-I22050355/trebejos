@@ -1,0 +1,57 @@
+/*
+ * Fuentes alojadas en el propio servidor (sin CDN). Solo WOFF2 —todos los navegadores actuales lo soportan, así que el
+ * formato WOFF de respaldo que traen los CSS de @fontsource nunca se pedía y solo engordaba el build— y solo los pesos que
+ * la interfaz usa de verdad (auditados recorriendo las pantallas):
+ *   Space Grotesk 600 y 700 · Inter 400 y 600 · JetBrains Mono 500 y 700.
+ * (Cuando el diseño pide otro peso, el navegador usa el más cercano de estos, como hasta ahora.)
+ */
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url(../node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-600-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(../node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-700-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url(../node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url(../node_modules/@fontsource/inter/files/inter-latin-600-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url(../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url(../node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-700-normal.woff2) format('woff2');
+}
+/* Íconos (Material Symbols), recortados a los que usa la app (11 KB en vez de 323 KB): se regenera con scripts/subset-icons.py. `block`: hasta que carga la fuente el ícono no se ve, en vez de enseñar su nombre en texto ("progress_activity"). */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-display: block;
+  font-weight: 400;
+  src: url(./fonts/material-symbols-subset.woff2) format('woff2');
+}
